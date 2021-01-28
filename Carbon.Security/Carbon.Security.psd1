@@ -18,10 +18,10 @@
     RootModule = 'Carbon.Security.psm1'
 
     # Version number of this module.
-    ModuleVersion = '0.0.0'
+    ModuleVersion = '1.0.0'
 
     # ID used to uniquely identify this module
-    GUID = ''
+    GUID = '225b9f63-3e3e-406c-87a0-33d34f30cd8e'
 
     # Author of this module
     Author = 'WebMD Health Services'
@@ -36,7 +36,7 @@
     Copyright = '(c) WebMD Health Services.'
 
     # Description of the functionality provided by this module
-    Description = ''
+    Description = 'Makes encrypting and decrypting strings and other security work easy.'
 
     # Minimum version of the Windows PowerShell engine required by this module
     PowerShellVersion = '5.1'
@@ -76,6 +76,7 @@
 
     # Functions to export from this module. Only list public function here.
     FunctionsToExport = @(
+        'Convert-CSecureStringToString'
     )
 
     # Cmdlets to export from this module. By default, you get a script module, so there are no cmdlets.
@@ -96,13 +97,19 @@
     # List of all files packaged with this module
     # FileList = @()
 
+    # HelpInfo URI of this module
+    # HelpInfoURI = ''
+
+    # Default prefix for commands exported from this module. Override the default prefix using Import-Module -Prefix.
+    # DefaultCommandPrefix = ''
+
     # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
     PrivateData = @{
 
         PSData = @{
 
             # Tags applied to this module. These help with module discovery in online galleries.
-            Tags = @( 'Desktop', 'Core' )
+            Tags = @( 'Desktop', 'Core', 'security', 'convert', 'securestring', 'string' )
 
             # A URL to the license for this module.
             LicenseUri = 'http://www.apache.org/licenses/LICENSE-2.0'
@@ -117,14 +124,10 @@
 
             # ReleaseNotes of this module
             ReleaseNotes = @'
+* Migrated `Convert-CSecureStringToString` from Carbon.
+* `Convert-CSecureStringToString` now accepts piping in secure strings.
 '@
         } # End of PSData hashtable
 
     } # End of PrivateData hashtable
-
-    # HelpInfo URI of this module
-    # HelpInfoURI = ''
-
-    # Default prefix for commands exported from this module. Override the default prefix using Import-Module -Prefix.
-    # DefaultCommandPrefix = ''
 }
