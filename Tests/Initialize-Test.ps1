@@ -26,6 +26,15 @@ $originalWhatIfPref = $Global:WhatIfPreference
 $Global:VerbosePreference = $VerbosePreference = 'SilentlyContinue'
 $Global:WhatIfPreference = $WhatIfPreference = $false
 
+$Global:PSModuleAutoloadingPreference = 'None'
+if( (Get-Module -Name 'Carbon') )
+{
+    Write-Warning -Message ('Removing Carbon. How did it get imported?')
+    Remove-Module -Name 'Carbon' -Force
+}
+
+Import-Module -Name 'Microsoft.PowerShell.Security'
+
 try
 {
     $modules = [ordered]@{
