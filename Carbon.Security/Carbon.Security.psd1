@@ -77,6 +77,9 @@
     # Functions to export from this module. Only list public function here.
     FunctionsToExport = @(
         'Convert-CSecureStringToString'
+        'Get-CCertificate',
+        'Install-CCertificate',
+        'Uninstall-CCertificate'
     )
 
     # Cmdlets to export from this module. By default, you get a script module, so there are no cmdlets.
@@ -109,7 +112,10 @@
         PSData = @{
 
             # Tags applied to this module. These help with module discovery in online galleries.
-            Tags = @( 'Desktop', 'Core', 'security', 'convert', 'securestring', 'string' )
+            Tags = @( 
+                'Desktop', 'Core', 'security', 'convert', 'securestring', 'string', 'certificate', 'certificates',
+                'x509', 'x509certificate', 'x509certificates', 'install', 'uninstall'
+             )
 
             # A URL to the license for this module.
             LicenseUri = 'http://www.apache.org/licenses/LICENSE-2.0'
@@ -124,8 +130,20 @@
 
             # ReleaseNotes of this module
             ReleaseNotes = @'
+# Upgrade Instructions
+
+If upgrading from Carbon 2.9.4, you should do the following:
+
+* Ensure the value passed to the `Password` parameter of the `Get-CCertificate` and `Install-CCertificate` functions is
+  a `[securestring]`.
+
+# Changes
+
 * Migrated `Convert-CSecureStringToString` from Carbon.
 * `Convert-CSecureStringToString` now accepts piping in secure strings.
+* Migrated `Get-CCertificate`, `Install-CCertificate`, and `Uninstall-CCertificate` from Carbon.
+* Changed the `Password` parameter on the `Get-CCertificate` and `Install-CCertificate` functions to be a
+  `[securestring]`. Plain text passwords are no longer allowed.
 '@
         } # End of PSData hashtable
 

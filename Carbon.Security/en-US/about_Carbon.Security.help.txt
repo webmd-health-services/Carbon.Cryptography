@@ -2,7 +2,16 @@ TOPIC
     about_Carbon.Security
 
 SHORT DESCRIPTION
-    Carbon.Security is a PowerShell module for...
+    Carbon.Security is a PowerShell module that:
+
+    * gets, installs, and uninstalls X509 certificates,
+    * converts `[securestring]` objects to `[strings]`
 
 LONG DESCRIPTION
-    The Carbon.Security PowerShell module...
+
+    # Functions
+
+    * `Convert-CSecureStringToString`: converts secure strings to strings.
+    * `Get-CCertificate`: reads X509 certificates from files or, on Windows, from the Windows certificate stores.
+    * `Install-CCertificate`: Installs X509 certificates into the Windows certificate store.
+    * `Uninstall-CCertificate`: Removes X509 certificates from the Windows certificate store.
