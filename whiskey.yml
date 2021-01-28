@@ -1,0 +1,83 @@
+
+PublishOn:
+- main
+- prerelease
+
+Build:
+- Version:
+    Path: Carbon.Security\Carbon.Security.psd1
+
+# Dot-sourcing files is expensive. Move all functions into .psm1 file to improve import speed. Do this before testing
+# to ensure the module still works.
+- MergeFile:
+    OnlyBy: BuildServer
+    # Builds run twice on some serves. Only run this step if the module hasn't been merged yet.
+    IfExists: Carbon.Security\Functions\*.ps1
+    Path:
+    - Carbon.Security\Functions\*.ps1
+    DestinationPath: Carbon.Security\Carbon.Security.psm1
+    DeleteSourceFiles: true
+    TextSeparator: "$(NewLine)$(NewLine)"
+
+- CopyFile:
+    IfExists: env:WHS_CI
+    Path:
+    - LICENSE
+    - NOTICE
+    DestinationDirectory: Carbon.Security
+
+- PowerShell:
+    ExceptDuring: Clean
+    Path: init.ps1
+
+- PowerShell:
+    OnlyDuring: Clean
+    Path: reset.ps1
+
+- Pester4:
+    Script: Tests\*.Tests.ps1
+
+# Build runs twice on some servers, so delete any ZIP file created by another build.
+- Delete:
+    Path: .output\*.zip
+
+- Zip:
+    ArchivePath: .output\Carbon.Security.zip
+    Path: 
+    - Carbon.Security
+
+Publish:
+
+- AppVeyorWaitForBuildJobs:
+    IfExists: env:PUBLISH
+    UnlessExists: env:APPVEYOR_PULL_REQUEST_NUMBER
+    ApiKeyID: AppVeyorBearerToken
+
+- PublishPowerShellModule:
+    IfExists: env:PUBLISH
+    UnlessExists: env:APPVEYOR_PULL_REQUEST_NUMBER
+    RepositoryName: PSGallery
+    RepositoryUri: https://powershellgallery.com/api/v2/
+    Path: Carbon.Security
+    ApiKeyID: PowerShellGalleryApiKey
+
+- SetVariableFromPowerShellDataFile:
+    Path: Carbon.Security\Carbon.Security.psd1
+    Variables:
+        PrivateData:
+            PSData:
+                ReleaseNotes: RELEASE_NOTES
+
+- GitHubRelease:
+    IfExists: env:PUBLISH
+    UnlessExists: env:APPVEYOR_PULL_REQUEST_NUMBER
+    RepositoryName: webmd-health-services/Carbon.Security
+    ApiKeyID: GitHubAccessToken
+    Tag: $(WHISKEY_SEMVER2_NO_BUILD_METADATA)
+    Commitish: $(WHISKEY_SCM_COMMIT_ID)
+    Name: $(WHISKEY_SEMVER2_NO_BUILD_METADATA)
+    Description: $(RELEASE_NOTES)
+    Assets:
+    - Path: .output\Carbon.Security.zip
+      ContentType: application/zip
+      Name: Carbon.Security-$(WHISKEY_SEMVER2_NO_BUILD_METADATA).zip

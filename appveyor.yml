@@ -1,0 +1,39 @@
+version: 0.0.{build}
+
+skip_tags: true
+
+skip_branch_with_pr: true
+
+image: 
+- Visual Studio 2015
+- Visual Studio 2017
+- Visual Studio 2019
+- Ubuntu
+- macOS
+
+build:
+  verbosity: minimal
+
+build_script:
+- pwsh: .\build.ps1
+
+for:
+- matrix:
+    only:
+      - image: Visual Studio 2015
+      - image: Visual Studio 2017
+  build_script:
+  - ps: .\build.ps1
+  - pwsh: .\build.ps1
+
+- matrix:
+    only:
+      - image: Ubuntu
+  environment:
+    LANG: us_US.UTF-8
+
+- matrix:
+    only:
+    - image: Visual Studio 2019
+  environment:
+    PUBLISH: True
