@@ -65,7 +65,7 @@ function Get-CCertificate
         [String]$Path,
         
         [Parameter(ParameterSetName='ByPath')]
-        # The password to the certificate. Can be plaintext or a [SecureString](http://msdn.microsoft.com/en-us/library/system.securestring.aspx).
+        # The password to the certificate. Must be a `[securestring]`.
         [securestring]$Password,
 
         [Parameter(ParameterSetName='ByPath')]
