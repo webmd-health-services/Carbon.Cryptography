@@ -4,8 +4,8 @@ Set-StrictMode -Version 'Latest'
 
 & (Join-Path -Path $PSScriptRoot -ChildPath 'Initialize-Test.ps1' -Resolve)
 
-$TestCertPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificate.cer' -Resolve
-$TestCert = New-Object Security.Cryptography.X509Certificates.X509Certificate2 $TestCertPath
+$testCertPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificate.cer' -Resolve
+$TestCert = New-Object Security.Cryptography.X509Certificates.X509Certificate2 $testCertPath
 $testCertificateThumbprint = '7D5CE4A8A5EC059B829ED135E9AD8607977691CC'
 $testCertFriendlyName = 'Pup Test Certificate'
 $testCertCertProviderPath = 'cert:\CurrentUser\My\{0}' -f $testCertificateThumbprint
@@ -35,17 +35,17 @@ function Init
     {
         if( -not (Get-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -StoreName My) ) 
         {
-            Write-Debug "TestCertPath  $($TestCertPath)"
-            Install-CCertificate -Path $TestCertPath -StoreLocation CurrentUser -StoreName My
+            Write-Debug "testCertPath  $($testCertPath)"
+            Install-CCertificate -Path $testCertPath -StoreLocation CurrentUser -StoreName My
         }
     }
 }
 
 Describe 'Get-CCertificate.when getting certificate from a file' {
     Init
-    $cert = Get-CCertificate -Path $TestCertPath
+    $cert = Get-CCertificate -Path $testCertPath
     It ('should have Path property') {
-        $cert.Path | Should -Be $TestCertPath
+        $cert.Path | Should -Be $testCertPath
     }
 }
 
@@ -101,7 +101,7 @@ Describe 'Get-CCertificate' {
         It 'should find certificate in custom store by thumbprint' {
             Init
             $expectedCert =
-                Install-CCertificate -Path $TestCertPath -StoreLocation CurrentUser -CustomStoreName 'Carbon' -PassThru
+                Install-CCertificate -Path $testCertPath -StoreLocation CurrentUser -CustomStoreName 'Carbon' -PassThru
             try
             {
                 $cert = Get-CCertificate -Thumbprint $expectedCert.Thumbprint -StoreLocation CurrentUser -CustomStoreName 'Carbon'
@@ -117,7 +117,7 @@ Describe 'Get-CCertificate' {
         It 'should find certificate in custom store by friendly name' {
             Init
             $expectedCert =
-                Install-CCertificate -Path $TestCertPath -StoreLocation CurrentUser -CustomStoreName 'Carbon' -PassThru
+                Install-CCertificate -Path $testCertPath -StoreLocation CurrentUser -CustomStoreName 'Carbon' -PassThru
             try
             {
                 $cert = Get-CCertificate -FriendlyName $expectedCert.FriendlyName -StoreLocation CurrentUser -CustomStoreName 'Carbon'
@@ -143,7 +143,7 @@ Describe 'Get-CCertificate' {
     
     It 'should find certificate by path' {
         Init
-        $cert = Get-CCertificate -Path $TestCertPath
+        $cert = Get-CCertificate -Path $testCertPath
         Assert-TestCert $cert
     }
     
@@ -152,7 +152,7 @@ Describe 'Get-CCertificate' {
         Push-Location -Path $PSScriptRoot
         try
         {
-            $cert = Get-CCertificate -Path ('.\Resources\{0}' -f (Split-Path -Leaf -Path $TestCertPath))
+            $cert = Get-CCertificate -Path ('.\Resources\{0}' -f (Split-Path -Leaf -Path $testCertPath))
             Assert-TestCert $cert
         }
         finally
@@ -183,6 +183,15 @@ Describe 'Get-CCertificate' {
         $cert | Should -BeNullOrEmpty
         $Error[1].Exception | Should -Not -BeNullOrEmpty
         $Error[1].Exception | Should -BeOfType ([Management.Automation.MethodInvocationException])
+    }
+}
+
+Describe 'Get-CCertificate.when not using parameter name' {
+    It 'should load by path' {
+        $cert = Get-CCertificate $testCertPath
+        $cert | Should -Not -BeNullOrEmpty
+        $cert.Thumbprint | Should -Be $testCertificateThumbprint
+        $cert.Path | Should -Be $testCertPath
     }
 }
 

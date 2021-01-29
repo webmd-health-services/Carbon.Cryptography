@@ -57,10 +57,10 @@ function Get-CCertificate
     Demonstrates how to get a certificate out of a Windows certificate store with its certificate path. Wildcards
     supported.
     #>
-    [CmdletBinding(DefaultParameterSetName='ByFriendlyName')]
+    [CmdletBinding(DefaultParameterSetName='ByPath')]
     [OutputType([Security.Cryptography.X509Certificates.X509Certificate2])]
     param(
-        [Parameter(Mandatory, ParameterSetName='ByPath')]
+        [Parameter(Mandatory, ParameterSetName='ByPath', Position=0)]
         # The path to the certificate. Can be a file system path or a certificate path, e.g. `cert:\`. Wildcards supported.
         [String]$Path,
         

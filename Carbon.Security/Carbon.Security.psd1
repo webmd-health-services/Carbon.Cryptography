@@ -152,6 +152,8 @@ If upgrading from Carbon 2, you should do the following:
   always re-install a certificate.
 * `Install-CCertificate` no longer always returns the installed certificate. If you want the certificate returned, use
   the new `-PassThru` switch.
+* The `Get-CCertificate` function's default parameter set is now loading a certificate by path and you no longer have
+  to explicitly provide the `-Path` parameter.
 '@
         } # End of PSData hashtable
 
