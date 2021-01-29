@@ -132,12 +132,14 @@
             ReleaseNotes = @'
 # Upgrade Instructions
 
-If upgrading from Carbon 2.9.4, you should do the following:
+If upgrading from Carbon 2, you should do the following:
 
 * `Get-CCertificate` and `Install-CCertificate` no longer accept plaintext passwords. Ensure the value passed to the 
   `Password` parameter of the `Get-CCertificate` and `Install-CCertificate` functions is a `[securestring]`.
 * `Install-CCertificate` no longer installs a certificate if it is already installed. Add a `-Force` switch to all
   usages of `Install-CCertificate` where you need existing certificates to be replaced.
+* `Install-CCertificate` no longer returns the installed certificate. Add a `-PassThru` switch to all usages of
+  `Install-CCertificate` where your code expects a return value.
 
 # Changes
 
@@ -146,7 +148,10 @@ If upgrading from Carbon 2.9.4, you should do the following:
 * Migrated `Get-CCertificate`, `Install-CCertificate`, and `Uninstall-CCertificate` from Carbon.
 * Changed the `Password` parameter on the `Get-CCertificate` and `Install-CCertificate` functions to be a
   `[securestring]`. Plain text passwords are no longer allowed.
-* `Install-CCertificate` no longer installs a certificate if it is already installed.
+* `Install-CCertificate` no longer installs a certificate if it is already installed. Use the new `-Force` switch to
+  always re-install a certificate.
+* `Install-CCertificate` no longer always returns the installed certificate. If you want the certificate returned, use
+  the new `-PassThru` switch.
 '@
         } # End of PSData hashtable
 

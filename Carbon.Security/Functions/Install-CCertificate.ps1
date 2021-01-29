@@ -89,7 +89,10 @@ function Install-CCertificate
 
         # Re-install the certificate, even if it is already installed. Calls the `Add()` method for store even if the
         # certificate is in the store. This function assumes that the `Add()` method replaces existing certificates.
-        [switch]$Force
+        [switch]$Force,
+
+        # Return the installed certificate.
+        [switch]$PassThru
     )
     
     Set-StrictMode -Version 'Latest'
@@ -133,7 +136,6 @@ function Install-CCertificate
     {
         $invokeCommandArgs['Session'] = $Session
     }
-
 
     Invoke-Command @invokeCommandArgs -ScriptBlock {
         [CmdletBinding()]
@@ -228,6 +230,9 @@ function Install-CCertificate
 
     } -ArgumentList $encodedCert,$Password,$StoreLocation,$StoreName,$CustomStoreName,$keyFlags,$Force,$WhatIfPreference,$VerbosePreference
 
-    return $Certificate
+    if( $PassThru )
+    {
+        return $Certificate
+    }
 }
 

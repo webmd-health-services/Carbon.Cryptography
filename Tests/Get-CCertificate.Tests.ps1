@@ -100,7 +100,8 @@ Describe 'Get-CCertificate' {
         
         It 'should find certificate in custom store by thumbprint' {
             Init
-            $expectedCert = Install-CCertificate -Path $TestCertPath -StoreLocation CurrentUser -CustomStoreName 'Carbon'
+            $expectedCert =
+                Install-CCertificate -Path $TestCertPath -StoreLocation CurrentUser -CustomStoreName 'Carbon' -PassThru
             try
             {
                 $cert = Get-CCertificate -Thumbprint $expectedCert.Thumbprint -StoreLocation CurrentUser -CustomStoreName 'Carbon'
@@ -115,7 +116,8 @@ Describe 'Get-CCertificate' {
         
         It 'should find certificate in custom store by friendly name' {
             Init
-            $expectedCert = Install-CCertificate -Path $TestCertPath -StoreLocation CurrentUser -CustomStoreName 'Carbon'
+            $expectedCert =
+                Install-CCertificate -Path $TestCertPath -StoreLocation CurrentUser -CustomStoreName 'Carbon' -PassThru
             try
             {
                 $cert = Get-CCertificate -FriendlyName $expectedCert.FriendlyName -StoreLocation CurrentUser -CustomStoreName 'Carbon'

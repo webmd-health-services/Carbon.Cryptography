@@ -4,17 +4,12 @@ Set-StrictMode -Version 'Latest'
 
 & (Join-Path -Path $PSScriptRoot -ChildPath 'Initialize-Test.ps1' -Resolve)
 
-$TestCertPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificate.cer' -Resolve
-$TestCert = New-Object 'Security.Cryptography.X509Certificates.X509Certificate2' $TestCertPath
+$testCertPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificate.cer' -Resolve
+$testCert = New-Object 'Security.Cryptography.X509Certificates.X509Certificate2' $testCertPath
 $TestCertProtectedPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificateWithPassword.cer' -Resolve
-$TestCertProtected = New-Object 'Security.Cryptography.X509Certificates.X509Certificate2' $TestCertProtectedPath,'password'
+$testCertProtected = New-Object 'Security.Cryptography.X509Certificates.X509Certificate2' $TestCertProtectedPath,'password'
 
 $onWindows = Test-COperatingSystem -IsWindows
-
-$skipRemotingTests = (Test-RunningUnderBuildServer) -or -not (Test-IsAdministrator)
-$skipRemotingParam = @{
-    'Skip' = $skipRemotingTests;
-}
 
 if( -not $onWindows )
 {
@@ -22,31 +17,40 @@ if( -not $onWindows )
     return
 }
 
+$skipRemotingTests = (Test-RunningUnderBuildServer) -or -not (Test-IsAdministrator)
+$skipRemotingParam = @{
+    'Skip' = $skipRemotingTests;
+}
+
+$output = $null
+
 function Init
 {
     $Global:Error.Clear()
 
-    if( (Get-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -StoreName My) )
+    $script:output = $null
+
+    if( (Get-CCertificate -Thumbprint $testCert.Thumbprint -StoreLocation CurrentUser -StoreName My) )
     {
-        Uninstall-CCertificate -Certificate $TestCert -StoreLocation CurrentUser -StoreName My
+        Uninstall-CCertificate -Certificate $testCert -StoreLocation CurrentUser -StoreName My
     }
 
-    if( (Get-CCertificate -Thumbprint $TestCertProtected.Thumbprint -StoreLocation CurrentUser -StoreName My) )
+    if( (Get-CCertificate -Thumbprint $testCertProtected.Thumbprint -StoreLocation CurrentUser -StoreName My) )
     {
-        Uninstall-CCertificate -Certificate $TestCertProtected -StoreLocation CurrentUser -StoreName My
+        Uninstall-CCertificate -Certificate $testCertProtected -StoreLocation CurrentUser -StoreName My
     }
 }
 
 function Reset
 {
-    Uninstall-CCertificate -Certificate $TestCert -StoreLocation CurrentUser -StoreName My
-    Uninstall-CCertificate -Certificate $TestCertProtected -StoreLocation CurrentUser -StoreName My
+    Uninstall-CCertificate -Certificate $testCert -StoreLocation CurrentUser -StoreName My
+    Uninstall-CCertificate -Certificate $testCertProtected -StoreLocation CurrentUser -StoreName My
 
     # Local Machine store is read-only on non-Windows operating systems.
     if( $onWindows )
     {
-        Uninstall-CCertificate -Certificate $TestCert -StoreLocation LocalMachine -StoreName My
-        Uninstall-CCertificate -Certificate $TestCertProtected -StoreLocation LocalMachine -StoreName My
+        Uninstall-CCertificate -Certificate $testCert -StoreLocation LocalMachine -StoreName My
+        Uninstall-CCertificate -Certificate $testCertProtected -StoreLocation LocalMachine -StoreName My
     }
 }
 
@@ -67,19 +71,51 @@ function ThenCertificateInstalled
     return $cert
 }
 
+function ThenCertificateReturned
+{
+    param(
+        [String]$WithThumbprint
+    )
+    $output | Should -Not -BeNullOrEmpty
+    $output | Should -BeOfType ([Security.Cryptography.X509Certificates.X509Certificate2])
+    $output.Thumbprint | Should -Be $WithThumbprint
+}
+
 function ThenNoError
 {
     $Global:Error | Should -BeNullOrEmpty
 }
 
+function ThenNothingReturned
+{
+    $output | Should -BeNullOrEmpty
+}
+
 function WhenInstalling
 {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName='FromX509Certificate2Object')]
     param(
-        $Certificate,
+        [Parameter(Mandatory, ParameterSetName='FromX509Certificate2Object', Position=0)]
+        [Security.Cryptography.X509Certificates.X509Certificate2]$FromX509Certificate2Object,
+
+        [Parameter(Mandatory, ParameterSetName='FromFile')]
+        [String]$FromFile,
+
+        [Parameter(Mandatory)]
         $For,
+        
+        [Parameter(Mandatory)]
         $In,
-        [switch]$WithForce
+
+        [switch]$WithForce,
+
+        [switch]$ReturningCertificate,
+
+        [switch]$ThatIsExportable,
+
+        [Management.Automation.Runspaces.PSSession]$OverSession,
+
+        [switch]$WhatIf
     )
 
     $conditionalParams = @{}
@@ -88,7 +124,50 @@ function WhenInstalling
         $conditionalParams['Force'] = $WithForce
     }
 
-    Install-CCertificate -Certificate $Certificate -StoreLocation $For -StoreName $In @conditionalParams
+    if( $FromX509Certificate2Object )
+    {
+        $conditionalParams['Certificate'] = $FromX509Certificate2Object
+    }
+
+    if( $FromFile )
+    {
+        $conditionalParams['Path'] = $FromFile
+    }
+
+    if( $ReturningCertificate )
+    {
+        $conditionalParams['PassThru'] = $true
+    }
+
+    if( $ThatIsExportable )
+    {
+        $conditionalParams['Exportable'] = $true
+    }
+
+    [Security.Cryptography.X509Certificates.StoreName]$storeName = 1
+    if( ([Enum]::TryParse($In, [ref]$storeName)) )
+    {
+        $conditionalParams['StoreName'] = $In
+    }
+    else
+    {
+        $conditionalParams['CustomStoreName'] = $In
+    }
+
+    if( $OverSession )
+    {
+        $conditionalParams['Session'] = $OverSession
+    }
+
+    if( $WhatIf )
+    {
+        $conditionalParams['WhatIf'] = $true
+    }
+
+    $output = $null
+    Install-CCertificate -StoreLocation $For @conditionalParams |
+        Tee-Object -Variable 'output'
+    $script:output = $output
 }
 
 Describe "Install-CCertificate" {
@@ -96,23 +175,23 @@ Describe "Install-CCertificate" {
     AfterEach { Reset }
 
     It 'should install certificate to local machine' {
-        $cert = Install-CCertificate -Path $TestCertPath -StoreLocation CurrentUser -StoreName My
-        $cert.Thumbprint | Should -Be $TestCert.Thumbprint
-        $cert = ThenCertificateInstalled $TestCert.Thumbprint -For 'CurrentUser' -In 'My' 
+        WhenInstalling -FromFile $testCertPath -For 'CurrentUser' -In 'My'
+        ThenCertificateInstalled $testCert.Thumbprint -For 'CurrentUser' -In 'My' 
+        ThenNothingReturned
+        $cert = Get-CCertificate -Thumbprint $testCert.Thumbprint -StoreLocation 'CurrentUser' -StoreName 'My'
         {
             $cert.Export( [Security.Cryptography.X509Certificates.X509ContentType]::Pfx ) | Out-Null
         } | Should -Throw
     }
 
     It 'should install certificate to local machine with relative path' {
-        $DebugPreference = 'Continue'
         Push-Location -Path $PSScriptRoot
         try
         {
-            $path = '.\Resources\{0}' -f (Split-Path -Leaf -Path $TestCertPath)
-            $cert = Install-CCertificate -Path $path -StoreLocation CurrentUser -StoreName My -Verbose
-            $cert.Thumbprint | Should -Be $TestCert.Thumbprint
-            $cert = ThenCertificateInstalled $TestCert.Thumbprint -For 'CurrentUser' -In 'My' 
+            $path = '.\Resources\{0}' -f (Split-Path -Leaf -Path $testCertPath)
+            WhenInstalling -FromFile $path -For 'CurrentUser' -In 'My'
+            ThenNothingReturned
+            ThenCertificateInstalled $testCert.Thumbprint -For 'CurrentUser' -In 'My' 
         }
         finally
         {
@@ -121,39 +200,34 @@ Describe "Install-CCertificate" {
     }
 
     It 'should install certificate to local machine as exportable' {
-        $cert = Install-CCertificate -Path $TestCertPath -StoreLocation CurrentUser -StoreName My -Exportable
-        $cert.Thumbprint | Should -Be $TestCert.Thumbprint
-        $cert = ThenCertificateInstalled $TestCert.Thumbprint -For 'CurrentUser' -In 'My' 
+        WhenInstalling -FromFile $testCertPath -For 'CurrentUser' -In 'My' -ThatIsExportable
+        ThenNothingReturned
+        ThenCertificateInstalled $testCert.Thumbprint -For 'CurrentUser' -In 'My' 
+        $cert = Get-CCertificate -Thumbprint $testCert.Thumbprint -StoreLocation 'CurrentUser' -StoreName 'My'
+        $cert | Should -Not -BeNullOrEmpty
         $bytes = $cert.Export( [Security.Cryptography.X509Certificates.X509ContentType]::Pfx )
         $bytes | Should -Not -BeNullOrEmpty
     }
 
-    It 'should install certificate in custom store' {
-        $cert = Install-CCertificate -Path $TestCertPath -StoreLocation CurrentUser -CustomStoreName 'SharePoint' 
-        $cert | Should -Not -BeNullOrEmpty
-        'cert:\CurrentUser\SharePoint' | Should -Exist
-        ('cert:\CurrentUser\SharePoint\{0}' -f $cert.Thumbprint) | Should -Exist
-    }
-
     It 'should install certificate' {
-        $cert = Install-CCertificate -Certificate $TestCert -StoreLocation CurrentUser -StoreName My
-        $cert | Should -Not -BeNullOrEmpty
-        ThenCertificateInstalled $TestCert.Thumbprint -For 'CurrentUser' -In 'My'
+        WhenInstalling $testCert -For 'CurrentUser' -In 'My'
+        ThenNothingReturned
+        ThenCertificateInstalled $testCert.Thumbprint -For 'CurrentUser' -In 'My'
     }
 
     It 'should install password protected certificate' {
-        $cert = Install-CCertificate -Certificate $TestCertProtected -StoreLocation CurrentUser -StoreName My
-        $cert | Should -Not -BeNullOrEmpty
-        ThenCertificateInstalled $TestCertProtected.Thumbprint -For 'CurrentUser' -In 'My'
+        WhenInstalling $testCertProtected -For 'CurrentUser' -In 'My'
+        ThenNothingReturned
+        ThenCertificateInstalled $testCertProtected.Thumbprint -For 'CurrentUser' -In 'My'
     }
 
     It 'should install certificate in remote computer' @skipRemotingParam {
         $session = New-PSSession -ComputerName $env:COMPUTERNAME
         try
         {
-            $cert = Install-CCertificate -Certificate $TestCert -StoreLocation CurrentUser -StoreName My -Session $session
-            $cert | Should -Not -BeNullOrEmpty
-            ThenCertificateInstalled $TestCert.Thumbprint -For 'CurrentUser' -In 'My'
+            WhenInstalling $testCert -For 'CurrentUser' -In 'My' -OverSession $session
+            ThenNothingReturned
+            ThenCertificateInstalled $testCert.Thumbprint -For 'CurrentUser' -In 'My'
         }
         finally
         {
@@ -162,53 +236,88 @@ Describe "Install-CCertificate" {
     }
 
     It 'should support ShouldProcess' {
-        $cert = Install-CCertificate -Path $TestCertPath -StoreLocation CurrentUser -StoreName My -WhatIf
-        $cert.Thumbprint | Should -Be $TestCert.Thumbprint
-        Join-Path -Path 'cert:\CurrentUser\My' -ChildPath $TestCert.Thumbprint |
+        WhenInstalling -FromFile $testCertPath -For 'CurrentUser' -In 'My' -WhatIf
+        ThenNothingReturned
+        Join-Path -Path 'cert:\CurrentUser\My' -ChildPath $testCert.Thumbprint |
             Should -Not -Exist
     }
 }
 
+Describe 'Install-CCertificate.when installing in custom store' {
+    AfterEach { Reset }
+    It 'should install certificate in the custom store' {
+        Init
+        $certInstallPath = Join-Path -Path 'cert:\CurrentUser\SharePoint' -ChildPath $testCert.Thumbprint
+        Uninstall-CCertificate -Thumbprint $testCert.Thumbprint -StoreLocation 'CurrentUser' -CustomStoreName 'SharePoint'
+        $certInstallPath | Should -Not -Exist
+        WhenInstalling -FromFile $testCertPath -For 'CurrentUser' -In 'SharePoint'
+        ThenNothingReturned
+        $certInstallPath | Should -Exist
+    }
+}
+
 Describe 'Install-CCertificate.when certificate is already installed' {
+    AfterEach { Reset }
     It 'should not re-install it' {
         Init
         $output =
-            WhenInstalling $TestCert -For 'CurrentUser' -In 'My' -Verbose 4>&1 |
+            WhenInstalling $testCert -For 'CurrentUser' -In 'My' -Verbose 4>&1 |
             Where-Object { $_ -is [Management.Automation.VerboseRecord] }
         $output | Should -HaveCount 1
         $output.Message | Should -Match 'Installing certificate'
-        ThenCertificateInstalled $TestCert.Thumbprint -For 'CurrentUser' -In 'My'
+        ThenCertificateInstalled $testCert.Thumbprint -For 'CurrentUser' -In 'My'
         ThenNoError
 
         # Install it again.
         $output = 
-            WhenInstalling $TestCert -For 'CurrentUser' -In 'My' -Verbose 4>&1 |
+            WhenInstalling $testCert -For 'CurrentUser' -In 'My' -Verbose 4>&1 |
             Where-Object { $_ -is [Management.Automation.VerboseRecord] }
         $output | Should -BeNullOrEmpty -Because 'certificates shouldn''t get re-installed'
         ThenNoError
-        ThenCertificateInstalled $TestCert.Thumbprint -For 'CurrentUser' -In 'My'
+        ThenCertificateInstalled $testCert.Thumbprint -For 'CurrentUser' -In 'My'
     }
 }
 
 Describe 'Install-CCertificate.when certificate is already installed and forcing install' {
+    AfterEach { Reset }
     It 'should not re-install it' {
         Init
         $output =
-            WhenInstalling $TestCert -For 'CurrentUser' -In 'My' -Verbose 4>&1 |
+            WhenInstalling $testCert -For 'CurrentUser' -In 'My' -Verbose 4>&1 |
             Where-Object { $_ -is [Management.Automation.VerboseRecord] }
         ThenNoError
         $output | Should -HaveCount 1
         $output.Message | Should -Match 'Installing certificate'
-        ThenCertificateInstalled $TestCert.Thumbprint -For 'CurrentUser' -In 'My'
+        ThenCertificateInstalled $testCert.Thumbprint -For 'CurrentUser' -In 'My'
 
         # Install it again.
         $output = 
-            WhenInstalling $TestCert -For 'CurrentUser' -In 'My' -WithForce -Verbose 4>&1 |
+            WhenInstalling $testCert -For 'CurrentUser' -In 'My' -WithForce -Verbose 4>&1 |
             Where-Object { $_ -is [Management.Automation.VerboseRecord] }
         ThenNoError
         $output | Should -HaveCount 1
         $output.Message | Should -Match 'Installing certificate'
-        ThenCertificateInstalled $TestCert.Thumbprint -For 'CurrentUser' -In 'My'
+        ThenCertificateInstalled $testCert.Thumbprint -For 'CurrentUser' -In 'My'
+    }
+}
+
+Describe 'Install-CCertificate.when requesting the installed certificate be returned' {
+    AfterEach { Reset }
+    Context 'certificate is not installed' {
+        It 'should return the certificate' {
+            Init
+            WhenInstalling $testCert -For 'CurrentUser' -In 'My' -ReturningCertificate
+            ThenCertificateReturned $testCert.Thumbprint
+        }
+    }
+    Context 'certificate is installed' {
+        It 'should return the certificate' {
+            Init
+            WhenInstalling $testCert -For 'CurrentUser' -In 'My'
+            ThenNothingReturned
+            WhenInstalling $testCert -For 'CurrentUser' -In 'My' -ReturningCertificate
+            ThenCertificateReturned $testCert.Thumbprint
+        }
     }
 }
 
