@@ -48,7 +48,7 @@ try
         if( $module )
         {
             # Don't constantly reload modules on the build server.
-            if( (Test-Path -Path 'env:WHS_CI') -and $module.Path.StartsWith($modulePath) )
+            if( (Test-Path -Path 'env:CARBON_CI') -and $module.Path.StartsWith($modulePath) )
             {
                 continue
             }

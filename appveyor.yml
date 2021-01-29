@@ -4,6 +4,9 @@ skip_tags: true
 
 skip_branch_with_pr: true
 
+environment:
+  CARBON_CI: True
+
 image: 
 - Visual Studio 2015
 - Visual Studio 2017
