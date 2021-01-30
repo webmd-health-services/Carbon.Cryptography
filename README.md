@@ -28,7 +28,12 @@ Import-Module -Name '.\Carbon.Security'
 
 # Commands
 
+* `Convert-CSecureStringToByte`: converts a secure string into an array of bytes (that can be easily cleared from from
+memory, unlike strings, who hang out forever).
 * `Convert-CSecureStringToString`: converts secure strings to strings.
 * `Get-CCertificate`: reads X509 certificates from files or, on Windows, from the Windows certificate stores.
 * `Install-CCertificate`: Installs X509 certificates into the Windows certificate store.
+* `Protect-CString`: Encrypt a string using the Windows Data Protection API (DPAPI; Windows only), public/private key
+cryptography, or symmetric cryptography.
 * `Uninstall-CCertificate`: Removes X509 certificates from the Windows certificate store.
+* `Unprotect-CString`: Decrypt a string that was encrypted with `Protect-CString`.

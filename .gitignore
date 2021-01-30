@@ -1,3 +1,5 @@
 /.output
 /PSModules
 /.vscode
+/Carbon.Security/Modules
+/Tests/.password
