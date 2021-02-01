@@ -20,7 +20,7 @@ Build:
     TextSeparator: "$(NewLine)$(NewLine)"
 
 - CopyFile:
-    IfExists: env:WHS_CI
+    IfExists: env:CARBON_CI
     Path:
     - LICENSE
     - NOTICE
@@ -33,6 +33,10 @@ Build:
 - PowerShell:
     OnlyDuring: Clean
     Path: reset.ps1
+
+- GetPowerShellModule:
+    Name: Carbon.Core
+    Version: 1.*
 
 - Pester4:
     Script: Tests\*.Tests.ps1

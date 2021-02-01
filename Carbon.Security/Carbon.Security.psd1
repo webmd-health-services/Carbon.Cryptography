@@ -77,6 +77,9 @@
     # Functions to export from this module. Only list public function here.
     FunctionsToExport = @(
         'Convert-CSecureStringToString'
+        'Get-CCertificate',
+        'Install-CCertificate',
+        'Uninstall-CCertificate'
     )
 
     # Cmdlets to export from this module. By default, you get a script module, so there are no cmdlets.
@@ -109,7 +112,10 @@
         PSData = @{
 
             # Tags applied to this module. These help with module discovery in online galleries.
-            Tags = @( 'Desktop', 'Core', 'security', 'convert', 'securestring', 'string' )
+            Tags = @( 
+                'Desktop', 'Core', 'security', 'convert', 'securestring', 'string', 'certificate', 'certificates',
+                'x509', 'x509certificate', 'x509certificates', 'install', 'uninstall'
+             )
 
             # A URL to the license for this module.
             LicenseUri = 'http://www.apache.org/licenses/LICENSE-2.0'
@@ -124,8 +130,30 @@
 
             # ReleaseNotes of this module
             ReleaseNotes = @'
+# Upgrade Instructions
+
+If upgrading from Carbon 2, you should do the following:
+
+* `Get-CCertificate` and `Install-CCertificate` no longer accept plaintext passwords. Ensure the value passed to the 
+  `Password` parameter of the `Get-CCertificate` and `Install-CCertificate` functions is a `[securestring]`.
+* `Install-CCertificate` no longer installs a certificate if it is already installed. Add a `-Force` switch to all
+  usages of `Install-CCertificate` where you need existing certificates to be replaced.
+* `Install-CCertificate` no longer returns the installed certificate. Add a `-PassThru` switch to all usages of
+  `Install-CCertificate` where your code expects a return value.
+
+# Changes
+
 * Migrated `Convert-CSecureStringToString` from Carbon.
 * `Convert-CSecureStringToString` now accepts piping in secure strings.
+* Migrated `Get-CCertificate`, `Install-CCertificate`, and `Uninstall-CCertificate` from Carbon.
+* Changed the `Password` parameter on the `Get-CCertificate` and `Install-CCertificate` functions to be a
+  `[securestring]`. Plain text passwords are no longer allowed.
+* `Install-CCertificate` no longer installs a certificate if it is already installed. Use the new `-Force` switch to
+  always re-install a certificate.
+* `Install-CCertificate` no longer always returns the installed certificate. If you want the certificate returned, use
+  the new `-PassThru` switch.
+* The `Get-CCertificate` function's default parameter set is now loading a certificate by path and you no longer have
+  to explicitly provide the `-Path` parameter.
 '@
         } # End of PSData hashtable
 
