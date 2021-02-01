@@ -1,8 +1,8 @@
 TOPIC
-    about_Carbon.Security
+    about_Carbon.Cryptography
 
 SHORT DESCRIPTION
-    Carbon.Security is a PowerShell module that:
+    Carbon.Cryptography is a PowerShell module that:
 
     * gets, installs, and uninstalls X509 certificates,
     * converts `[securestring]` objects to `[strings]`

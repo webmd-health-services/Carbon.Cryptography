@@ -1,6 +1,6 @@
 # Overview
 
-The "Carbon.Security" module has functions that help manage X509 certificates and working with secure strings.
+The "Carbon.Cryptography" module has functions that help manage X509 certificates and working with secure strings.
 
 It started out as part of the [Carbon](http://get-carbon.org) module. But when that module become too big and unwieldy,
 its security-related functionality was moved into this module.
@@ -15,15 +15,15 @@ its security-related functionality was moved into this module.
 To install globally:
 
 ```powershell
-Install-Module -Name 'Carbon.Security'
-Import-Module -Name 'Carbon.Security'
+Install-Module -Name 'Carbon.Cryptography'
+Import-Module -Name 'Carbon.Cryptography'
 ```
 
 To install privately:
 
 ```powershell
-Save-Module -Name 'Carbon.Security' -Path '.'
-Import-Module -Name '.\Carbon.Security'
+Save-Module -Name 'Carbon.Cryptography' -Path '.'
+Import-Module -Name '.\Carbon.Cryptography'
 ```
 
 # Commands

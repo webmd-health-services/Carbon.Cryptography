@@ -15,7 +15,7 @@
 @{
 
     # Script module or binary module file associated with this manifest.
-    RootModule = 'Carbon.Security.psm1'
+    RootModule = 'Carbon.Cryptography.psm1'
 
     # Version number of this module.
     ModuleVersion = '1.0.0'
@@ -124,7 +124,7 @@
             LicenseUri = 'http://www.apache.org/licenses/LICENSE-2.0'
 
             # A URL to the main website for this project.
-            ProjectUri = 'https://github.com/webmd-health-services/Carbon.Security'
+            ProjectUri = 'https://github.com/webmd-health-services/Carbon.Cryptography'
 
             # A URL to an icon representing this module.
             # IconUri = ''
