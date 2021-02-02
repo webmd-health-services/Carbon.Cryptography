@@ -55,7 +55,7 @@ filter Protect-CString
 
         $key = [Security.Cryptography.AesManaged]::New().Key
 
-    You can save this key as a string by encoding it as a base-64 string:
+    You can save this key as a string by encoding it as a base64 string:
 
         $base64EncodedKey = [Convert]::ToBase64String($key)
 
@@ -180,7 +180,8 @@ filter Protect-CString
         [Security.Cryptography.RSAEncryptionPadding]$Padding,
 
         [Parameter(Mandatory, ParameterSetName='Symmetric')]
-        # The key to use to encrypt the secret. Can be a `SecureString`, a `String`, or an array of bytes. Must be 16, 24, or 32 characters/bytes in length.
+        # The key to use to encrypt the secret. Can be a `SecureString` or an array of bytes. Must be 16, 24, or 32
+        # characters/bytes in length. The secure string must only contain ASCII characters.
         [Object]$Key
     )
 

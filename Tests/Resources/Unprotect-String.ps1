@@ -4,7 +4,7 @@
 #>
 param(
     [Parameter(Mandatory)]
-    # A base-64 encoded string that was protected with Carbon's `protect-String`.
+    # A base64 encoded string that was protected with Carbon's `protect-String`.
     [String]$ProtectedString
 )
 
@@ -15,4 +15,4 @@ Add-Type -AssemblyName 'System.Security'
 
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\..\Carbon.Security\Carbon.Security.psd1' -Resolve)
 
-Unprotect-CString -ProtectedString $ProtectedString
+Unprotect-CString -ProtectedString $ProtectedString -AsPlainText

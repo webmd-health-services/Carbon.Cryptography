@@ -143,6 +143,9 @@ If upgrading from Carbon 2, you should do the following:
   usages of `Install-CCertificate` where you need existing certificates to be replaced.
 * `Install-CCertificate` no longer returns the installed certificate. Add a `-PassThru` switch to all usages of
   `Install-CCertificate` where your code expects a return value.
+* `Unprotect-CString` now returns decrypted text as a `[securestring]`. Add the `-AsPlainText` to use the old behavior
+  and get back a plain text string. Remove the `-AsSecureString` parameter if you were previously requesting a secure
+  string.
 
 # Changes
 
@@ -157,6 +160,8 @@ If upgrading from Carbon 2, you should do the following:
   the new `-PassThru` switch.
 * The `Get-CCertificate` function's default parameter set is now loading a certificate by path and you no longer have
   to explicitly provide the `-Path` parameter.
+* The `Unprotect-CString` function now returns the decrypted text as a `[securestring]` by default instead of a
+  `[String]`. Use the `-AsPlainText` switch to get a plain text string back (not recommended).
 '@
         } # End of PSData hashtable
 

@@ -25,30 +25,30 @@ Describe 'Unprotect-CString' {
             $originalText = [Guid]::NewGuid().ToString()
             $protectedText = Protect-CString -String $originalText -ForUser
             $actualText = Unprotect-CString -ProtectedString $protectedText
-            $actualText | Should -Be $originalText
+            $actualText | Convert-CSecureStringToString | Should -Be $originalText
         }
 
 
         It 'should unprotect string from machine scope' {
             $secret = Protect-CString -String 'Hello World' -ForComputer
             $machine = Unprotect-CString -ProtectedString $secret
-            $machine | Should -Be 'Hello World'
+            $machine | Convert-CSecureStringToString | Should -Be 'Hello World'
         }
 
         It 'should unprotect string from user scope' {
             $secret = Protect-CString -String 'Hello World' -ForUser
             $machine = Unprotect-CString -ProtectedString $secret
-            $machine | Should -Be 'Hello World'
+            $machine | Convert-CSecureStringToString | Should -Be 'Hello World'
         }
 
 
         It 'should unprotect strings in pipeline' {
             $secrets = @('Foo', 'Fizz', 'Buzz', 'Bar') | Protect-CString -ForUser | Unprotect-CString
             $secrets | Should -HaveCount 4
-            $secrets[0] | Should -Be 'Foo'
-            $secrets[1] | Should -Be 'Fizz'
-            $secrets[2] | Should -Be 'Buzz'
-            $secrets[3] | Should -Be 'Bar'
+            $secrets[0] | Convert-CSecureStringToString | Should -Be 'Foo'
+            $secrets[1] | Convert-CSecureStringToString | Should -Be 'Fizz'
+            $secrets[2] | Convert-CSecureStringToString | Should -Be 'Buzz'
+            $secrets[3] | Convert-CSecureStringToString | Should -Be 'Bar'
         }
 
         It 'should handle thumbprint to cert with no private key' {
@@ -69,7 +69,7 @@ Describe 'Unprotect-CString' {
             {
                 $revealedSecret = Unprotect-CString -ProtectedString $rsaCipherText -PrivateKeyPath ('cert:\CurrentUser\My\{0}' -f $cert.Thumbprint)
                 $Global:Error.Count | Should -Be 0
-                $revealedSecret | Should -Be $secret
+                $revealedSecret | Convert-CSecureStringToString | Should -Be $secret
             }
             finally
             {
@@ -83,7 +83,7 @@ Describe 'Unprotect-CString' {
             {
                 $revealedSecret = Unprotect-CString -ProtectedString $rsaCipherText -Thumbprint $cert.Thumbprint
                 $Global:Error.Count | Should -Be 0
-                $revealedSecret | Should -Be $secret
+                $revealedSecret | Convert-CSecureStringToString | Should -Be $secret
             }
             finally
             {
@@ -91,27 +91,26 @@ Describe 'Unprotect-CString' {
             }
         }
 
-        It 'should convert to secure string' {
+        It 'should convert to plain text' {
             $originalText = [Guid]::NewGuid().ToString()
             $protectedText = Protect-CString -String $originalText -ForUser
-            [securestring]$secureSecret = Unprotect-CString -ProtectedString $protectedText -AsSecureString
-            $secureSecret | Should -BeOfType ([securestring])
-            (Convert-CSecureStringToString -SecureString $secureSecret) | Should -Be $originalText
-            $secureSecret.IsReadOnly() | Should -Be $true
+            $plainText = Unprotect-CString -ProtectedString $protectedText -AsPlainText
+            $plainText | Should -BeOfType ([String])
+            $plainText | Should -Be $originalText
         }
     }
 
     It 'should load certificate from file' {
         $revealedSecret = Unprotect-CString -ProtectedString $rsaCipherText -PrivateKeyPath $privateKeyPath
         $Global:Error.Count | Should -Be 0
-        $revealedSecret | Should -Be $secret
+        $revealedSecret | Convert-CSecureStringToString | Should -Be $secret
     }
 
     It 'should handle missing private key' {
         $revealedSecret = Unprotect-CString -ProtectedString $rsaCipherText -PrivateKeyPath $publicKeyPath -ErrorAction SilentlyContinue
         $Global:Error.Count | Should -BeGreaterThan 0
         $Global:Error[0] | Should -Match 'doesn''t have a private key'
-        $revealedSecret | Should -BeNullOrEmpty
+        $revealedSecret | Convert-CSecureStringToString | Should -BeNullOrEmpty
     }
 
     It 'should load password protected private key' {
@@ -120,14 +119,14 @@ Describe 'Unprotect-CString' {
                                           -PrivateKeyPath $privateKey2Path `
                                           -Password (ConvertTo-SecureString -String 'fubar' -AsPlainText -Force)
         $Global:Error.Count | Should -Be 0
-        $revealedText | Should -Be $secret
+        $revealedText | Convert-CSecureStringToString | Should -Be $secret
     }
 
     It 'should decrypt with certificate' {
         $cert = Get-CCertificate -Path $privateKeyPath
         $revealedSecret = Unprotect-CString -ProtectedString $rsaCipherText -Certificate $cert
         $Global:Error.Count | Should -Be 0
-        $revealedSecret | Should -Be $secret
+        $revealedSecret | Convert-CSecureStringToString | Should -Be $secret
     }
 
     It 'should handle invalid thumbprint' {

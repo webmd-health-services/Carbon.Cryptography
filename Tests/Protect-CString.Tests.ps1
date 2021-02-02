@@ -100,7 +100,9 @@ Describe 'Protect-CString' {
         $ciphertext | Should -Not -BeNullOrEmpty
         $ciphertext | Should -Not -Be $secret
         $privateKey = Get-CCertificate -Path $privateKeyFilePath
-        (Unprotect-CString -ProtectedString $ciphertext -Certificate $privateKey) | Should -Be $secret
+        (Unprotect-CString -ProtectedString $ciphertext -Certificate $privateKey) |
+            Convert-CSecureStringToString |
+            Should -Be $secret
     }
     
     It 'should handle not getting an rsa certificate' {
@@ -128,7 +130,9 @@ Describe 'Protect-CString' {
         $ciphertext | Should -Not -BeNullOrEmpty
         $ciphertext | Should -Not -Be $secret
         $privateKey = Get-CCertificate -Path $privateKeyFilePath 
-        (Unprotect-CString -ProtectedString $ciphertext -Certificate $privateKey) | Should -Be $secret
+        (Unprotect-CString -ProtectedString $ciphertext -Certificate $privateKey) |
+            Convert-CSecureStringToString |
+            Should -Be $secret
     }
     
     It 'should encrypt a secure string' {
@@ -142,7 +146,8 @@ Describe 'Protect-CString' {
         $ciphertext | Should -Not -BeNullOrEmpty
         $ciphertext | Should -Not -Be $secret
         $privateKey = Get-CCertificate -Path $privateKeyFilePath 
-        $decryptedPassword = Unprotect-CString -ProtectedString $ciphertext -Certificate $privateKey
+        $decryptedPassword = 
+            Unprotect-CString -ProtectedString $ciphertext -Certificate $privateKey | Convert-CSecureStringToString
         $decryptedPassword | Should -Be $password
         $passwordBytes = [Text.Encoding]::Unicode.GetBytes($password)
         $decryptedBytes = [Text.Encoding]::Unicode.GetBytes($decryptedPassword)
@@ -159,7 +164,9 @@ Describe 'Protect-CString' {
         $cipherText | Should -Not -Be $object
         $privateKey = Get-CCertificate -Path $privateKeyFilePath
         Assert-IsBase64EncodedString( $cipherText )
-        (Unprotect-CString -ProtectedString $cipherText -Certificate $privateKey) | Should -Be $object.ToString()
+        (Unprotect-CString -ProtectedString $cipherText -Certificate $privateKey) |
+            Convert-CSecureStringToString |
+            Should -Be $object.ToString()
     }
 
     It 'should encrypt from certificate file with relative path' {
@@ -170,7 +177,9 @@ Describe 'Protect-CString' {
         $ciphertext | Should -Not -BeNullOrEmpty
         $ciphertext | Should -Not -Be $secret
         $privateKey = Get-CCertificate -Path $privateKeyFilePath
-        (Unprotect-CString -ProtectedString $ciphertext -Certificate $privateKey) | Should -Be $secret
+        (Unprotect-CString -ProtectedString $ciphertext -Certificate $privateKey) |
+            Convert-CSecureStringToString |
+            Should -Be $secret
     }
     
     It 'should use direct encryption padding switch' {
@@ -181,9 +190,9 @@ Describe 'Protect-CString' {
         $ciphertext | Should -Not -BeNullOrEmpty
         $ciphertext | Should -Not -Be $secret
         $revealedSecret = Unprotect-CString -ProtectedString $ciphertext `
-                                           -PrivateKeyPath $privateKeyFilePath `
-                                           -Padding ([Security.Cryptography.RSAEncryptionPadding]::Pkcs1)
-        $revealedSecret | Should -Be $secret
+                                            -PrivateKeyPath $privateKeyFilePath `
+                                            -Padding ([Security.Cryptography.RSAEncryptionPadding]::Pkcs1)
+        $revealedSecret | Convert-CSecureStringToString | Should -Be $secret
     }
 
 }
@@ -203,7 +212,7 @@ foreach( $keySize in @( 128, 192, 256 ) )
             $keySecureString.AppendChar($char)
         }
 
-        foreach( $key in @( $passphrase, $keyBytes, $keySecureString) )
+        foreach( $key in @( $keyBytes, $keySecureString) )
         {
             Context ('key as {0}' -f $key.GetType().FullName) {
                 $ciphertext = Protect-CString -String $secret -Key $key
@@ -216,7 +225,7 @@ foreach( $keySize in @( 128, 192, 256 ) )
 
                 It 'should encrypt ciphertext' {
                     $revealedSecret = Unprotect-CString -ProtectedString $ciphertext -Key $key
-                    $revealedSecret | Should -Be $secret
+                    $revealedSecret | Convert-CSecureStringToString | Should -Be $secret
                 }
             }
         }

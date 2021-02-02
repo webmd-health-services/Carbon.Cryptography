@@ -7,13 +7,11 @@ function Unprotect-CString
     
     .DESCRIPTION
     `Unprotect-CString` decrypts a string encrypted via the Data Protection API (DPAPI), RSA, or AES into an array of
-    bytes, which is then converted to a UTF-8 encoded string. After decrypting, the decrypted array of bytes is cleared
-    in memory.
+    bytes, which is then converted to an array of chars, which are stored in a `[securestring]`. All arrays of bytes and
+    chars are cleared from memory once decryption completes.
 
-    Use the `AsSecureString` switch to cause `Unprotect-CString` to return the decrypted string as a 
-    `[SecureString]`, thus preventing your secret from hanging out in memory. When decrypting to a secure string, the
-    secret is decrypted to an array of bytes, and then converted to an array of characters, which are used to create
-    the secure string. The array of chars and array of decrypted bytes are cleared from memory.
+    Use the `AsPlainText` switch to return a plain text string instead. When you do this, your decrypted string will
+    remain in memory (and maybe disk) for an unknowable amount of time.
 
     `Unprotect-CString` can decrypt using the following techniques.
 
@@ -43,10 +41,12 @@ function Unprotect-CString
     `Unprotect-CString` uses `[Security.Cryptography.Aes]::Create()` to get an object that can do the decryption.
 
     Symmetric encryption requires a random, unique initialization vector (i.e. IV) everytime you encrypt something. If
-    you encrypted the string with `Protect-CString`, without using your own IV, one was generated for you and prepended
-    to the encrypted string. If you want to use your own IV, pass it to the `IV` parameter.
+    you encrypted the string with `Protect-CString`, one was generated for you and prepended to the encrypted string. If
+    you encrypted the original string yourself, make sure the first 16 bytes of the encrypted text is the IV (since
+    the encrypted bytes are base64 encoded, that means the first 24 characters of the encrypted string should be the
+    IV).
 
-    The help topic for `Protect-CString` demonstrates how to generate an AES key and how to encode it as a base-64
+    The help topic for `Protect-CString` demonstrates how to generate an AES key and how to encode it as a base64
     string.
 
     .LINK
@@ -109,7 +109,7 @@ function Unprotect-CString
     decrypting with a plaintext password.
 
     .EXAMPLE
-    Unprotect-String -ProtectedString $ciphertext -Key (Read-Host -Prompt 'Enter password (must be 16, 24, or 32 characters long):') -AsSecureString)
+    Unprotect-CString -ProtectedString $ciphertext -Key (Read-Host -Prompt 'Enter password (must be 16, 24, or 32 characters long):') -AsSecureString)
 
     Demonstrates how to decrypt a secret with a secure string that is the key, password, or passphrase. In this case,
     the user is prompted for the password securely.
@@ -152,14 +152,15 @@ function Unprotect-CString
         [Security.Cryptography.RSAEncryptionPadding]$Padding,
 
         [Parameter(Mandatory, ParameterSetName='Symmetric')]
-        # The key to use to decrypt the secret. Must be a `[securestring]`, `[String]`, or an array of bytes.
+        # The key to use to decrypt the secret. Must be a `[securestring]` or an array of bytes. The characters in the
+        # secure string must be ASCII characters.
         [Object]$Key,
 
-        # Returns the decrypted value as a secure string. This is the most secure option. Decryption can decrypt the 
-        # ciphertext directly to an array of bytes and characters, which can then be put in a `[securestring]`. The 
-        # decrypted string is never stored as a `[String]` object (strings are immutable and remain in memory) and the 
-        # arrays used during decryption are cleared.
-        [switch]$AsSecureString
+        # Returns the decrypted value as plain text. The default is to return the decrypted value as a `[securestring]`.
+        # When returned as a secure string, the decrypted bytes are only stored in memory as arrays of bytes and chars,
+        # which are all cleared once the decrypted text is in the secure string. Once a secure string is converted to a
+        # string, that string stays in memory (and possibly disk) for an unknowable about of time.
+        [switch]$AsPlainText
     )
 
     process
@@ -192,9 +193,9 @@ function Unprotect-CString
                 $count = $certificates | Measure-Object | Select-Object -ExpandProperty 'Count'
                 if( $count -gt 1 )
                 {
-                    $msg = "Found $($count) certificates at ""$($PrivateKeyPath)"". Arbitrarily choosing the first one. " +
-                        'If you get errors, consider passing the exact path to the certificate you want to the ' +
-                        '"PrivateKeyPath" parameter.'
+                    $msg = "Found $($count) certificates at ""$($PrivateKeyPath)"". Arbitrarily choosing the first " +
+                           'one. If you get errors, consider passing the exact path to the certificate you want to ' +
+                           'the "Unprotect-CString" function''s "PrivateKeyPath" parameter.'
                     Write-Warning -Message $msg
                 }
                 $Certificate = $certificates | Select-Object -First 1
@@ -297,7 +298,11 @@ function Unprotect-CString
 
         try
         {
-            if( $AsSecureString )
+            if( $AsPlainText )
+            {
+                [Text.Encoding]::UTF8.GetString( $decryptedBytes )
+            }
+            else
             {
                 $secureString = [Security.SecureString]::New()
                 [char[]]$chars = [Text.Encoding]::UTF8.GetChars( $decryptedBytes )
@@ -309,10 +314,6 @@ function Unprotect-CString
 
                 $secureString.MakeReadOnly()
                 return $secureString
-            }
-            else
-            {
-                [Text.Encoding]::UTF8.GetString( $decryptedBytes )
             }
         }
         finally

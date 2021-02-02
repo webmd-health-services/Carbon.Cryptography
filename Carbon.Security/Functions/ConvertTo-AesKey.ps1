@@ -25,21 +25,17 @@ function ConvertTo-AesKey
             {
                 # SecureString is two bytes per char. We need an encoding that is one byte per char, otherwise the key
                 # will be twice as big as it should be.
-                $Key = [Text.Encoding]::Convert([Text.Encoding]::Unicode, [Text.Encoding]::UTF8, $unicodeKey)
+                $Key = [Text.Encoding]::Convert([Text.Encoding]::Unicode, [Text.Encoding]::ASCII, $unicodeKey)
             }
             finally
             {
                 $unicodeKey.Clear() # Keep it out of memory!
             }
         }
-        elseif( $InputObject -is [string] )
-        {
-            $Key = [Text.Encoding]::UTF8.GetBytes($InputObject)
-        }
         else
         {
-            $msg = "An encryption key must be a [securestring], a [String], or an array of bytes, but we got passed " +
-                   "a ""$($InputObject.GetType().FullName)"". If you are passing an array of bytes, make sure you " +
+            $msg = 'An encryption key must be a [securestring] or an array of bytes, but we got passed a ' +
+                   """$($InputObject.GetType().FullName)"". If you are passing an array of bytes, make sure you " +
                    'explicitly cast it as a `byte[]`, e.g. `([byte[]])@( ... )`.'
             Write-Error -Message $msg
             return
