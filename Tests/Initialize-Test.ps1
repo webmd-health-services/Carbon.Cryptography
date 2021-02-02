@@ -26,11 +26,21 @@ $originalWhatIfPref = $Global:WhatIfPreference
 $Global:VerbosePreference = $VerbosePreference = 'SilentlyContinue'
 $Global:WhatIfPreference = $WhatIfPreference = $false
 
+$Global:PSModuleAutoloadingPreference = 'None'
+if( (Get-Module -Name 'Carbon') )
+{
+    Write-Warning -Message ('Removing Carbon. How did it get imported?')
+    Remove-Module -Name 'Carbon' -Force
+}
+
+Import-Module -Name 'Microsoft.PowerShell.Security'
+Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\PSModules\Carbon.Core' -Resolve)
+
 try
 {
     $modules = [ordered]@{
-        'Carbon.Security' = '..\Carbon.Security';
-        'Carbon.SecurityTestHelper' = 'Carbon.SecurityTestHelper';
+        'Carbon.Cryptography' = '..\Carbon.Cryptography';
+        'Carbon.CryptographyTestHelper' = 'Carbon.CryptographyTestHelper';
     }
     foreach( $moduleName in $modules.Keys )
     {
@@ -39,7 +49,7 @@ try
         if( $module )
         {
             # Don't constantly reload modules on the build server.
-            if( (Test-Path -Path 'env:WHS_CI') -and $module.Path.StartsWith($modulePath) )
+            if( (Test-Path -Path 'env:CARBON_CI') -and $module.Path.StartsWith($modulePath) )
             {
                 continue
             }

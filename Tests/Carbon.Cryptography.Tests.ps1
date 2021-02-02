@@ -66,15 +66,15 @@ function ThenHelpTopic
     }
 }
 
-Describe ('Carbon.Security.help topic') {
+Describe ('Carbon.Cryptography.help topic') {
     It 'should have one' {
         Init
         GivenModuleImported
-        ThenHelpTopic 'about_Carbon.Security' -Exists
+        ThenHelpTopic 'about_Carbon.Cryptography' -Exists
     }
 }
 
-Describe ('Carbon.Security.command verbs') {
+Describe ('Carbon.Cryptography.command verbs') {
     It 'should only use approved verbs' {
         Init
         GivenModuleImported
@@ -82,11 +82,11 @@ Describe ('Carbon.Security.command verbs') {
     }
 }
 
-Describe ('Carbon.Security.command help topics') {
+Describe ('Carbon.Cryptography.command help topics') {
     It 'should have a help topic for each command' {
         Init
         GivenModuleImported
-        foreach( $cmd in (Get-Command -Module 'Carbon.Security' -CommandType Function,Cmdlet,Filter))
+        foreach( $cmd in (Get-Command -Module 'Carbon.Cryptography' -CommandType Function,Cmdlet,Filter))
         {
             ThenHelpTopic $cmd.Name -Exists -HasSynopsis -HasDescription -HasExamples
         }

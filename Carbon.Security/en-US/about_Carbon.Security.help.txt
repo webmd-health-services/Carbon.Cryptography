@@ -1,8 +1,0 @@
-TOPIC
-    about_Carbon.Security
-
-SHORT DESCRIPTION
-    Carbon.Security is a PowerShell module for...
-
-LONG DESCRIPTION
-    The Carbon.Security PowerShell module...
