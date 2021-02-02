@@ -13,6 +13,6 @@ Set-StrictMode -Version 'Latest'
 
 Add-Type -AssemblyName 'System.Security'
 
-Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\..\Carbon.Security\Carbon.Security.psd1' -Resolve)
+Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\..\Carbon.Cryptography\Carbon.Cryptography.psd1' -Resolve)
 
 Unprotect-CString -ProtectedString $ProtectedString -AsPlainText

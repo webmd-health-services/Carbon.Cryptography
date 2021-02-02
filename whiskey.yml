@@ -5,17 +5,17 @@ PublishOn:
 
 Build:
 - Version:
-    Path: Carbon.Security\Carbon.Security.psd1
+    Path: Carbon.Cryptography\Carbon.Cryptography.psd1
 
 # Dot-sourcing files is expensive. Move all functions into .psm1 file to improve import speed. Do this before testing
 # to ensure the module still works.
 - MergeFile:
     OnlyBy: BuildServer
     # Builds run twice on some serves. Only run this step if the module hasn't been merged yet.
-    IfExists: Carbon.Security\Functions\*.ps1
+    IfExists: Carbon.Cryptography\Functions\*.ps1
     Path:
-    - Carbon.Security\Functions\*.ps1
-    DestinationPath: Carbon.Security\Carbon.Security.psm1
+    - Carbon.Cryptography\Functions\*.ps1
+    DestinationPath: Carbon.Cryptography\Carbon.Cryptography.psm1
     DeleteSourceFiles: true
     TextSeparator: "$(NewLine)$(NewLine)"
 
@@ -24,7 +24,7 @@ Build:
     Path:
     - LICENSE
     - NOTICE
-    DestinationDirectory: Carbon.Security
+    DestinationDirectory: Carbon.Cryptography
 
 - GetPowerShellModule:
     Name: Carbon
@@ -45,7 +45,7 @@ Build:
 - GetPowerShellModule:
     Name: Carbon.Core
     Version: 1.0.0
-    Path: Carbon.Security\Modules
+    Path: Carbon.Cryptography\Modules
 
 - Pester4:
     Script: Tests\*.Tests.ps1
@@ -55,9 +55,9 @@ Build:
     Path: .output\*.zip
 
 - Zip:
-    ArchivePath: .output\Carbon.Security.zip
+    ArchivePath: .output\Carbon.Cryptography.zip
     Path: 
-    - Carbon.Security
+    - Carbon.Cryptography
 
 Publish:
 
@@ -71,11 +71,11 @@ Publish:
     UnlessExists: env:APPVEYOR_PULL_REQUEST_NUMBER
     RepositoryName: PSGallery
     RepositoryUri: https://powershellgallery.com/api/v2/
-    Path: Carbon.Security
+    Path: Carbon.Cryptography
     ApiKeyID: PowerShellGalleryApiKey
 
 - SetVariableFromPowerShellDataFile:
-    Path: Carbon.Security\Carbon.Security.psd1
+    Path: Carbon.Cryptography\Carbon.Cryptography.psd1
     Variables:
         PrivateData:
             PSData:
@@ -84,13 +84,13 @@ Publish:
 - GitHubRelease:
     IfExists: env:PUBLISH
     UnlessExists: env:APPVEYOR_PULL_REQUEST_NUMBER
-    RepositoryName: webmd-health-services/Carbon.Security
+    RepositoryName: webmd-health-services/Carbon.Cryptography
     ApiKeyID: GitHubAccessToken
     Tag: $(WHISKEY_SEMVER2_NO_BUILD_METADATA)
     Commitish: $(WHISKEY_SCM_COMMIT_ID)
     Name: $(WHISKEY_SEMVER2_NO_BUILD_METADATA)
     Description: $(RELEASE_NOTES)
     Assets:
-    - Path: .output\Carbon.Security.zip
+    - Path: .output\Carbon.Cryptography.zip
       ContentType: application/zip
-      Name: Carbon.Security-$(WHISKEY_SEMVER2_NO_BUILD_METADATA).zip
+      Name: Carbon.Cryptography-$(WHISKEY_SEMVER2_NO_BUILD_METADATA).zip

@@ -210,10 +210,10 @@ Describe 'Uninstall-CCertificate.when local machine cert shows up in current use
         Init
         GivenAnInstalledCertificate
         Mock -CommandName 'Get-ChildItem' `
-             -ModuleName 'Carbon.Security' `
+             -ModuleName 'Carbon.Cryptography' `
              -ParameterFilter { $Path.Count -eq 2 -and $Path[0] -eq 'Cert:\LocalMachine' -and $Path[1] -eq 'Cert:\CurrentUser' } 
         WhenUninstallingByThumbprint
-        Assert-MockCalled -CommandName 'Get-ChildItem' -ModuleName 'Carbon.Security' -Times 1
+        Assert-MockCalled -CommandName 'Get-ChildItem' -ModuleName 'Carbon.Cryptography' -Times 1
     }
 }
 

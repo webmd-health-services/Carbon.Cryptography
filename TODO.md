@@ -5,8 +5,8 @@ Pass the name of the module to the `ModuleName` parameter. The script will:
 
 * Rename this file to TODO.md (there are additional steps to take afterward)
 * Puts the default README.md file in place.
-* Rename every file that has `Carbon.Security` in its name, replacing `Carbon.Security` with the module name.
-* Replaces `Carbon.Security` in every file with the module name.
+* Rename every file that has `Carbon.Cryptography` in its name, replacing `Carbon.Cryptography` with the module name.
+* Replaces `Carbon.Cryptography` in every file with the module name.
 * Installs and enables [Whiskey](https://github.com/webmd-health-services/Whiskey/wiki).
 * Removes this script.
 * If Git is installed, adds all the changes, and amends the initial commit with them so all traces of the template are

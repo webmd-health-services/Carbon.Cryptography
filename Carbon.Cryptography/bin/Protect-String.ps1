@@ -24,7 +24,7 @@ Set-StrictMode -Version 'Latest'
 # Keep cause this script is used by PowerShell 2.
 Add-Type -AssemblyName 'System.Security'
 
-Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\Carbon.Security.psd1' -Resolve)
+Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\Carbon.Cryptography.psd1' -Resolve)
 
 $string = Unprotect-CString -ProtectedString $ProtectedString
 Protect-CString -String $string -ForUser

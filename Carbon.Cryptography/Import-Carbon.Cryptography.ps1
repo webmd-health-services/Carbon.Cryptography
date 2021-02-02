@@ -1,4 +1,4 @@
-# Copyright WebMD Health Services
+# Copyright Aaron Jensen and WebMD Health Services
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,16 +14,16 @@
 
 <#
 .SYNOPSIS
-Imports the Carbon.Security module into the current session.
+Imports the Carbon.Cryptography module into the current session.
 
 .DESCRIPTION
-The `Import-Carbon.Security.ps1` script imports the Carbon.Security module into the current session. If the module is already
+The `Import-Carbon.Cryptography.ps1` script imports the Carbon.Cryptography module into the current session. If the module is already
 loaded, it is removed, then reloaded.
 
 .EXAMPLE
-.\Import-Carbon.Security.ps1
+.\Import-Carbon.Cryptography.ps1
 
-Demonstrates how to use this script to import the Carbon.Security module  into the current PowerShell session.
+Demonstrates how to use this script to import the Carbon.Cryptography module  into the current PowerShell session.
 #>
 [CmdletBinding()]
 param(
@@ -40,12 +40,12 @@ $Global:WhatIfPreference = $WhatIfPreference = $false
 
 try
 {
-    if( (Get-Module -Name 'Carbon.Security') )
+    if( (Get-Module -Name 'Carbon.Cryptography') )
     {
-        Remove-Module -Name 'Carbon.Security' -Force
+        Remove-Module -Name 'Carbon.Cryptography' -Force
     }
 
-    Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'Carbon.Security.psd1' -Resolve)
+    Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'Carbon.Cryptography.psd1' -Resolve)
 }
 finally
 {

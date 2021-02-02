@@ -39,8 +39,8 @@ Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\PSModules\Carb
 try
 {
     $modules = [ordered]@{
-        'Carbon.Security' = '..\Carbon.Security';
-        'Carbon.SecurityTestHelper' = 'Carbon.SecurityTestHelper';
+        'Carbon.Cryptography' = '..\Carbon.Cryptography';
+        'Carbon.CryptographyTestHelper' = 'Carbon.CryptographyTestHelper';
     }
     foreach( $moduleName in $modules.Keys )
     {
