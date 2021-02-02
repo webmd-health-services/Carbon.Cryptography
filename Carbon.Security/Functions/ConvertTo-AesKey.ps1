@@ -57,7 +57,7 @@ function ConvertTo-AesKey
         # Got a secure string.
         else
         {
-            $msg = "$($commonMsg) Make sure that when the secure string key is UTF8 encoded and converted to a byte " +
+            $msg = "$($commonMsg) Make sure that when the secure string key is UTF-8 encoded and converted to a byte " +
                    "array, that array is 16, 32, or 64 bytes long. $($From) received a secure string key that is " +
                    "$($Key.Length) bytes long."
         }

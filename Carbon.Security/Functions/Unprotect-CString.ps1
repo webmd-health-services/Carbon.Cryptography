@@ -41,8 +41,8 @@ function Unprotect-CString
     `Unprotect-CString` uses `[Security.Cryptography.Aes]::Create()` to get an object that can do the decryption.
 
     You can only pass a `[securestring]` or byte array as the key. When passing a secure string, make sure that when
-    encoded as UTF8 and converted to a byte array, it is 16, 24, or 32 bytes long. This code will tell you how long your
-    plain text password is, in UTF8 bytes:
+    encoded as UTF-8 and converted to a byte array, it is 16, 24, or 32 bytes long. This code will tell you how long your
+    plain text password is, in UTF-8 bytes:
 
         [Text.Encoding]::Convert([Text.Encoding]::Unicode, [Text.Encoding]::UTF8, [Text.Encoding]::Unicode.GetBytes($key)).Length
 
@@ -159,8 +159,8 @@ function Unprotect-CString
 
         [Parameter(Mandatory, ParameterSetName='Symmetric')]
         # The key to use to decrypt the secret. Must be a `[securestring]` or an array of bytes. The characters in the
-        # secure string are converted to UTF8 encoding before being converted into bytes. Make sure the key is the
-        # correct length when UTF8 encoded, i.e. make sure the following code returns a 16, 24, or 32 byte byte array
+        # secure string are converted to UTF-8 encoding before being converted into bytes. Make sure the key is the
+        # correct length when UTF-8 encoded, i.e. make sure the following code returns a 16, 24, or 32 byte byte array
         # (where $key is the plain text key).
         #
         #     [Text.Encoding]::Convert([Text.Encoding]::Unicode, [Text.Encoding]::UTF8, [Text.Encoding]::Unicode.GetBytes($key)).Length
@@ -169,7 +169,7 @@ function Unprotect-CString
         # Returns the decrypted value as plain text. The default is to return the decrypted value as a `[securestring]`.
         # When returned as a secure string, the decrypted bytes are only stored in memory as arrays of bytes and chars,
         # which are all cleared once the decrypted text is in the secure string. Once a secure string is converted to a
-        # string, that string stays in memory (and possibly disk) for an unknowable about of time.
+        # string, that string stays in memory (and possibly disk) for an unknowable amout of time.
         [switch]$AsPlainText
     )
 

@@ -10,7 +10,7 @@ filter Protect-CString
     a plaintext string or a secure string to the `String` parameter. When encrypting a `SecureString`, it is converted
     to an array of bytes, encrypted, then the array of bytes is cleared from memory (i.e. the plaintext version of the
     `SecureString` is only in memory long enough to encrypt it). All strings and secure string bytes are re-encoded
-    from UTF16/Unicode to UTF8 before encrypting.
+    from UTF-16/Unicode to UTF-8 before encrypting.
 
     ##  Windows Data Protection API (DPAPI)
 
@@ -49,7 +49,7 @@ filter Protect-CString
     `Protect-CString` encrypts with the object returned by `[Security.Cryptography.Aes]::Create()`
 
     You can only pass a `[securestring]` or array of bytes as the key. The array of bytes must be 16, 24, or 32 bytes
-    long. When passing a secure string, when UTF8 encoded and converted to a byte array, it must also be 16, 24, or 32
+    long. When passing a secure string, when UTF-8 encoded and converted to a byte array, it must also be 16, 24, or 32
     bytes long. You can use this code to check on the byte length of a plain text string (where $key is the plain text
     key):
 
@@ -154,7 +154,7 @@ filter Protect-CString
         # encrypted, then the plaintext bytes are cleared from memory (i.e. the plaintext password is in memory for the
         # amount of time it takes to encrypt it). Passing a secure string is the most secure usage.
         #
-        # The string and secure string bytes are re-encoded as UTF8 before encrypting.
+        # The string and secure string bytes are re-encoded as UTF-8 before encrypting.
         [Object]$String,
 
         [Parameter(Mandatory, ParameterSetName='DPAPICurrentUser')]
@@ -190,10 +190,10 @@ filter Protect-CString
         [Security.Cryptography.RSAEncryptionPadding]$Padding,
 
         [Parameter(Mandatory, ParameterSetName='Symmetric')]
-        # The key to use to encrypt the secret. Must be a `[securestring]` or an array of bytes. If passing a byte array,
-        # must be 16, 24, or 32 bytes long. If passing a secure string, when it is UTF8 encoded and converted to a byte
-        # array, that array must also be 16, 24, or 32 bytes long. This code will tell you the length, in bytes, of your
-        # plain text key (stored in the `$key`variable):
+        # The key to use to encrypt the secret. Must be a `[securestring]` or an array of bytes. If passing a byte
+        # array, # must be 16, 24, or 32 bytes long. If passing a secure string, when it is UTF-8 encoded and converted
+        # to a byte # array, that array must also be 16, 24, or 32 bytes long. This code will tell you the length, in
+        # bytes, of your plain text key (stored in the `$key`variable):
         #
         #   [Text.Encoding]::Convert([Text.Encoding]::Unicode, [Text.Encoding]::UTF8, [Text.Encoding]::Unicode.GetBytes($key)).Length
         [Object]$Key
