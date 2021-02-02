@@ -4,7 +4,7 @@ function Unprotect-CString
     <#
     .SYNOPSIS
     Decrypts a string.
-    
+
     .DESCRIPTION
     `Unprotect-CString` decrypts a string encrypted via the Data Protection API (DPAPI), RSA, or AES into an array of
     bytes, which is then converted to an array of chars, which are stored in a `[securestring]`. All arrays of bytes and
@@ -25,13 +25,13 @@ function Unprotect-CString
     RSA is an assymetric encryption/decryption algorithm, which requires a public/private key pair. It uses a private
     key to decrypt a secret encrypted with the public key. Only the private key can decrypt secrets.
 
-    You can specify the private key in these ways: 
-    
+    You can specify the private key in these ways:
+
      * with a `[Security.Cryptography.X509Certificates.X509Certificate2]` object, via the `Certificate` parameter
      * with an X509 certificate file, via the `PrivateKeyPath` parameter. On Windows, you can use paths to items in the
        `cert:\` drive.
-     
-     On Windows, you can also pass the thumbprint to a certificate to the `Thumbprint` parameter, and 
+
+     On Windows, you can also pass the thumbprint to a certificate to the `Thumbprint` parameter, and
      `Unprotect-CString` will search the `cert:\` store for a matching certificate with a private key.
 
     ## AES
@@ -39,6 +39,12 @@ function Unprotect-CString
     AES is a symmetric encryption/decryption algorithm. You supply a 16-, 24-, or 32-byte key, password, or passphrase
     with the `Key` parameter, and that key is used to decrypt. You must decrypt with the same key you used to encrypt.
     `Unprotect-CString` uses `[Security.Cryptography.Aes]::Create()` to get an object that can do the decryption.
+
+    You can only pass a `[securestring]` or byte array as the key. When passing a secure string, make sure that when
+    encoded as UTF8 and converted to a byte array, it is 16, 24, or 32 bytes long. This code will tell you how long your
+    plain text password is, in UTF8 bytes:
+
+        [Text.Encoding]::Convert([Text.Encoding]::Unicode, [Text.Encoding]::UTF8, [Text.Encoding]::Unicode.GetBytes($key)).Length
 
     Symmetric encryption requires a random, unique initialization vector (i.e. IV) everytime you encrypt something. If
     you encrypted the string with `Protect-CString`, one was generated for you and prepended to the encrypted string. If
@@ -51,7 +57,7 @@ function Unprotect-CString
 
     .LINK
     New-CRsaKeyPair
-        
+
     .LINK
     Protect-CString
 
@@ -60,9 +66,9 @@ function Unprotect-CString
 
     .EXAMPLE
     Unprotect-CString -ProtectedString $encryptedPassword
-    
+
     Demonstrates how to decrypt a protected string which was encrypted with Microsoft's DPAPI. Windows only.
-    
+
     .EXAMPLE
     Unprotect-CString -ProtectedString $ciphertext -Certificate $myCert
 
@@ -72,12 +78,12 @@ function Unprotect-CString
 
     .EXAMPLE
     $ciphertext | Unprotect-CString -Certificate $certWithPrivateKey
-    
+
     Demonstrates that you can pipe encrypted strings to `Unprotect-CString`.
 
     .EXAMPLE
     $ciphertext | Unprotect-CString -Certificate $certWithPrivateKey -AsSecureString
-    
+
     Demonstrates that you can get a secure string returned to you by using the `AsSecureString` switch. This is the most
     secure way to decrypt, as the decrypted text is only in memory as arrays of bytes/chars during decryption. The
     arrays are immediately cleared after decryption. The decrypted text is never stored as a `[String]` (which remain
@@ -118,7 +124,7 @@ function Unprotect-CString
     Unprotect-CString -ProtectedString $ciphertext -Key ([byte[]]@(163,163,185,174,205,55,157,219,121,146,251,116,43,203,63,38,73,154,230,112,82,112,151,29,189,135,254,187,164,104,45,30))
 
     Demonstrates that you can pass in an array of bytes as the key to the `Key` parameter. Those bytes will be used to
-    decrypt the ciphertext. 
+    decrypt the ciphertext.
     #>
     [CmdletBinding(DefaultParameterSetName='DPAPI')]
     param(
@@ -136,24 +142,28 @@ function Unprotect-CString
         [String]$Thumbprint,
 
         [Parameter(Mandatory, ParameterSetName='RSAByPath')]
-        # The path to the private key to use for encrypting. If given a path on the file system, the file must be
+        # The path to the private key to use for decrypting. If given a path on the file system, the file must be
         # loadable as a `[Security.X509Certificates.X509Certificate2]` object. On Windows, you can also pass the path
         # to a certificate in PowerShell's `cert:` drive.
         [String]$PrivateKeyPath,
 
-        [Parameter(ParameterSetName='RSAByPath')] 
-        # The password for the private key, if it has one. Must be a `[string]` or `[securestring]`.
+        [Parameter(ParameterSetName='RSAByPath')]
+        # The password for the private key, if it has one. Must be a `[securestring]`.
         [securestring]$Password,
 
         [Parameter(ParameterSetName='RSAByCertificate')]
         [Parameter(ParameterSetName='RSAByThumbprint')]
         [Parameter(ParameterSetName='RSAByPath')]
-        # The padding mode to use when encrypting. Defaults to `[Security.Cryptography.RSAEncryptionPadding]::OaepSHA1`.
+        # The padding mode to use when decrypting. Defaults to `[Security.Cryptography.RSAEncryptionPadding]::OaepSHA1`.
         [Security.Cryptography.RSAEncryptionPadding]$Padding,
 
         [Parameter(Mandatory, ParameterSetName='Symmetric')]
         # The key to use to decrypt the secret. Must be a `[securestring]` or an array of bytes. The characters in the
-        # secure string must be ASCII characters.
+        # secure string are converted to UTF8 encoding before being converted into bytes. Make sure the key is the
+        # correct length when UTF8 encoded, i.e. make sure the following code returns a 16, 24, or 32 byte byte array
+        # (where $key is the plain text key).
+        #
+        #     [Text.Encoding]::Convert([Text.Encoding]::Unicode, [Text.Encoding]::UTF8, [Text.Encoding]::Unicode.GetBytes($key)).Length
         [Object]$Key,
 
         # Returns the decrypted value as plain text. The default is to return the decrypted value as a `[securestring]`.
@@ -167,7 +177,7 @@ function Unprotect-CString
     {
         Set-StrictMode -Version 'Latest'
         Use-CallerPreference -Cmdlet $PSCmdlet -Session $ExecutionContext.SessionState
-        
+
         [byte[]]$decryptedBytes = $null
         [byte[]]$encryptedBytes = [Convert]::FromBase64String($ProtectedString)
         if( $PSCmdlet.ParameterSetName -eq 'DPAPI' )
@@ -227,12 +237,12 @@ function Unprotect-CString
 
             [Security.Cryptography.RSA]$privateKey = $null
             $privateKeyType = $Certificate.PrivateKey.GetType()
-            $isRsa = $privateKeyType.IsSubclassOf([Security.Cryptography.RSA]) 
+            $isRsa = $privateKeyType.IsSubclassOf([Security.Cryptography.RSA])
             if( -not $isRsa )
             {
                 $msg = "$($certDesc) is not an RSA key. Found a private key of type ""$($privateKeyType.FullName)"", but " +
                     "expected type ""$([Security.Cryptography.RSA].FullName)"" or one of its sub-types."
-                Write-Error -Message $msg -ErrorAction $ErrorActionPreference 
+                Write-Error -Message $msg -ErrorAction $ErrorActionPreference
                 return
             }
 
@@ -265,24 +275,25 @@ function Unprotect-CString
                 $encryptedStream = New-Object -TypeName 'IO.MemoryStream' -ArgumentList (,$encryptedBytes)
                 try
                 {
-                    $decryptor = $aes.CreateDecryptor($aes.Key, $iv)
+                    $cryptoStream =
+                        [Security.Cryptography.CryptoStream]::New($encryptedStream,
+                            $aes.CreateDecryptor($aes.Key, $iv),
+                            ([Security.Cryptography.CryptoStreamMode]::Read))
                     try
                     {
-                        $mode = [Security.Cryptography.CryptoStreamMode]::Read
-                        $cryptoStream = [Security.Cryptography.CryptoStream]::New($encryptedStream, $decryptor, $mode)
+                        $streamReader = [IO.StreamReader]::New($cryptoStream)
                         try
                         {
-                            $decryptedBytes = [Byte[]]::New($encryptedBytes.Length)
-                            [void]$cryptoStream.Read($decryptedBytes, 0, $decryptedBytes.Length)
+                            [byte[]]$decryptedBytes = [Text.Encoding]::UTF8.GetBytes($streamReader.ReadToEnd())
                         }
                         finally
                         {
-                            $cryptoStream.Dispose()
+                            $streamReader.Dispose()
                         }
                     }
                     finally
                     {
-                        $decryptor.Dispose()
+                        $cryptoStream.Dispose()
                     }
                 }
                 finally
@@ -298,14 +309,15 @@ function Unprotect-CString
 
         try
         {
+            $decryptedBytes = [Text.Encoding]::Convert([Text.Encoding]::UTF8, [Text.Encoding]::Unicode, $decryptedBytes)
             if( $AsPlainText )
             {
-                [Text.Encoding]::UTF8.GetString( $decryptedBytes )
+                [Text.Encoding]::Unicode.GetString($decryptedBytes)
             }
             else
             {
                 $secureString = [Security.SecureString]::New()
-                [char[]]$chars = [Text.Encoding]::UTF8.GetChars( $decryptedBytes )
+                [char[]]$chars = [Text.Encoding]::Unicode.GetChars( $decryptedBytes )
                 for( $idx = 0; $idx -lt $chars.Count ; $idx++ )
                 {
                     $secureString.AppendChar( $chars[$idx] )

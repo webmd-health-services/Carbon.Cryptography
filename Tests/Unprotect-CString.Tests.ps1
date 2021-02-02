@@ -143,3 +143,24 @@ Describe 'Unprotect-CString' {
         $revealedSecret | Should -BeNullOrEmpty
     }
 }
+
+Describe 'Unprotect-String.AES' {
+    It 'should fail on invalid key length' {
+        $key = ConvertTo-SecureString ('a' * 8) -AsPlainText -Force
+        { Protect-CString -String 'text' -Key $key -ErrorAction Stop } |
+            Should -Throw 'requires a 128-bit, 192-bit, or 256-bit key (16, 24, or 32 bytes, respectively).'
+    }
+
+    foreach ($keyLength in @(16, 24, 32))
+    {
+        It "should succeed with key length: $($keyLength)" {
+            $key = ConvertTo-SecureString ('a' * $keyLength) -AsPlainText -Force
+            $originalText = [Guid]::NewGuid().ToString()
+            $protectedText = Protect-CString -String $originalText -Key $key
+            $actualText = Unprotect-CString -ProtectedString $protectedText -Key $key -AsPlainText
+            $actualText | Should -Be $originalText -Because 'the decrypted string should be unchanged'
+            $actualText.Length | Should -Be $originalText.Length -Because 'the decrypted string should not contain any extra bytes'
+        }
+    }
+}
+
