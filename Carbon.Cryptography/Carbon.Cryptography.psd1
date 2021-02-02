@@ -1,4 +1,4 @@
-# Copyright WebMD Health Services
+# Copyright Aaron Jensen and WebMD Health Services
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
 # limitations under the License
 
 @{
-
     # Script module or binary module file associated with this manifest.
     RootModule = 'Carbon.Cryptography.psm1'
 
@@ -24,16 +23,16 @@
     GUID = '225b9f63-3e3e-406c-87a0-33d34f30cd8e'
 
     # Author of this module
-    Author = 'WebMD Health Services'
+    Author = 'Aaron Jensen and WebMD Health Services'
 
     # Company or vendor of this module
-    CompanyName = 'WebMD Health Services'
+    CompanyName = 'Aaron Jensen and WebMD Health Services'
 
     # If you want to support .NET Core, add 'Core' to this list.
     CompatiblePSEditions = @( 'Desktop', 'Core' )
 
     # Copyright statement for this module
-    Copyright = '(c) WebMD Health Services.'
+    Copyright = '(c) Aaron Jensen and WebMD Health Services.'
 
     # Description of the functionality provided by this module
     Description = 'Makes encrypting and decrypting strings and other security work easy.'
@@ -116,8 +115,10 @@
 
             # Tags applied to this module. These help with module discovery in online galleries.
             Tags = @( 
-                'Desktop', 'Core', 'security', 'convert', 'securestring', 'string', 'certificate', 'certificates',
-                'x509', 'x509certificate', 'x509certificates', 'install', 'uninstall'
+                'Desktop', 'Core', 'Caron', 'security', 'convert', 'securestring', 'string', 'certificate',
+                'certificates', 'x509', 'x509certificate', 'x509certificates', 'install', 'uninstall', 'encrypt',
+                'decrypt', 'aes', 'rsa', 'protect', 'unprotect', 'crypto', 'cryptography', 'dpapi', 'key', 'public-key',
+                'private-key', 'asymmetric', 'symmetric'
              )
 
             # A URL to the license for this module.

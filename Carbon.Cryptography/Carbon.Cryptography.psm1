@@ -1,4 +1,4 @@
-# Copyright WebMD Health Services
+# Copyright Aaron Jensen and WebMD Health Services
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
