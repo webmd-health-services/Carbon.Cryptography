@@ -26,6 +26,14 @@ Build:
     - NOTICE
     DestinationDirectory: Carbon.Security
 
+- GetPowerShellModule:
+    Name: Carbon
+    Version: 2.*
+
+- GetPowerShellModule:
+    Name: Carbon.Core
+    Version: 1.*
+
 - PowerShell:
     ExceptDuring: Clean
     Path: init.ps1
@@ -36,7 +44,8 @@ Build:
 
 - GetPowerShellModule:
     Name: Carbon.Core
-    Version: 1.*
+    Version: 1.0.0
+    Path: Carbon.Security\Modules
 
 - Pester4:
     Script: Tests\*.Tests.ps1

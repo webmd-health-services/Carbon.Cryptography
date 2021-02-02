@@ -29,7 +29,7 @@ function Convert-CSecureStringToString
     [CmdletBinding()]
     [OutputType([String])]
     param(
-        [Parameter(Mandatory,ValueFromPipeline)]
+        [Parameter(Mandatory, ValueFromPipeline)]
         # The secure string to convert.
         [securestring]$SecureString
     )
@@ -39,7 +39,15 @@ function Convert-CSecureStringToString
         Set-StrictMode -Version 'Latest'
         Use-CallerPreference -Cmdlet $PSCmdlet -Session $ExecutionContext.SessionState
 
-        return [pscredential]::New('username', $SecureString).GetNetworkCredential().Password
+        $bytes = Convert-CSecureStringToByte -SecureString $SecureString
+        try
+        {
+            return [Text.Encoding]::Unicode.GetString($bytes)
+        }
+        finally
+        {
+            $bytes.Clear()
+        }
     }
 }
 

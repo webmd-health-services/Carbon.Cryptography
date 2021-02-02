@@ -66,9 +66,8 @@ function ThenCertificateInstalled
     )
 
     $cert = Get-CCertificate -Thumbprint $WithThumbprint -StoreLocation $For -StoreName $In
-    $cert | Should -Not -BeNullOrEmpty | Out-Null
-    $cert.Thumbprint | Should -Be $WithThumbprint | Out-Null
-    return $cert
+    $cert | Should -Not -BeNullOrEmpty
+    $cert.Thumbprint | Should -Be $WithThumbprint
 }
 
 function ThenCertificateReturned

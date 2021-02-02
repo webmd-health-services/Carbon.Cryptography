@@ -15,10 +15,17 @@
 #Requires -Version 5.1
 Set-StrictMode -Version 'Latest'
 
+Add-Type -AssemblyName 'System.Security'
+
 # Functions should use $moduleRoot as the relative root from which to find
 # things. A published module has its function appended to this file, while a 
 # module in development has its functions in the Functions directory.
 $moduleRoot = $PSScriptRoot
+$moduleBinRoot = Join-Path -Path $moduleRoot -ChildPath 'bin'
+$moduleBinRoot | Out-Null # To make the PSScriptAnalyzer squiggle go away.
+$privateModulesRoot = Join-Path -Path $moduleRoot -ChildPath 'Modules'
+
+Import-Module -Name (Join-Path -Path $privateModulesRoot -ChildPath 'Carbon.Core')
 
 # Store each of your module's functions in its own file in the Functions 
 # directory. On the build server, your module's functions will be appended to 

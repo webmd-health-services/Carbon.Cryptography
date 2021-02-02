@@ -23,8 +23,8 @@ function Install-CCertificate
 
     To install a certificate on a remote computer, create a remoting session with the `New-PSSession` cmdlet, and pass
     the session object to this function's `Session` parameter. When installing to a remote computer, the certificate's
-    binary data is converted to a base-64 encoded string and sent to the remote computer, where it is converted back
-    into a certificate. If installing a certificate from a file, the file's bytes are converted to base-64, sent to the
+    binary data is converted to a base64 encoded string and sent to the remote computer, where it is converted back
+    into a certificate. If installing a certificate from a file, the file's bytes are converted to base64, sent to the
     remote computer, saved as a temporary file, installed, and the temporary file is removed.
 
     .OUTPUTS
@@ -141,7 +141,7 @@ function Install-CCertificate
         [CmdletBinding()]
         param(
             [Parameter(Mandatory)]
-            # The base-64 encoded certificate to install.
+            # The base64 encoded certificate to install.
             [String]$EncodedCertificate,
 
             # The password for the certificate.
