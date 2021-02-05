@@ -17,7 +17,7 @@
     RootModule = 'Carbon.Cryptography.psm1'
 
     # Version number of this module.
-    ModuleVersion = '1.0.0'
+    ModuleVersion = '1.0.1'
 
     # ID used to uniquely identify this module
     GUID = '225b9f63-3e3e-406c-87a0-33d34f30cd8e'
@@ -134,35 +134,8 @@
 
             # ReleaseNotes of this module
             ReleaseNotes = @'
-# Upgrade Instructions
-
-If upgrading from Carbon 2, you should do the following:
-
-* `Get-CCertificate` and `Install-CCertificate` no longer accept plaintext passwords. Ensure the value passed to the 
-  `Password` parameter of the `Get-CCertificate` and `Install-CCertificate` functions is a `[securestring]`.
-* `Install-CCertificate` no longer installs a certificate if it is already installed. Add a `-Force` switch to all
-  usages of `Install-CCertificate` where you need existing certificates to be replaced.
-* `Install-CCertificate` no longer returns the installed certificate. Add a `-PassThru` switch to all usages of
-  `Install-CCertificate` where your code expects a return value.
-* `Unprotect-CString` now returns decrypted text as a `[securestring]`. Add the `-AsPlainText` to use the old behavior
-  and get back a plain text string. Remove the `-AsSecureString` parameter if you were previously requesting a secure
-  string.
-
-# Changes
-
-* Migrated `Convert-CSecureStringToString` from Carbon.
-* `Convert-CSecureStringToString` now accepts piping in secure strings.
-* Migrated `Get-CCertificate`, `Install-CCertificate`, and `Uninstall-CCertificate` from Carbon.
-* Changed the `Password` parameter on the `Get-CCertificate` and `Install-CCertificate` functions to be a
-  `[securestring]`. Plain text passwords are no longer allowed.
-* `Install-CCertificate` no longer installs a certificate if it is already installed. Use the new `-Force` switch to
-  always re-install a certificate.
-* `Install-CCertificate` no longer always returns the installed certificate. If you want the certificate returned, use
-  the new `-PassThru` switch.
-* The `Get-CCertificate` function's default parameter set is now loading a certificate by path and you no longer have
-  to explicitly provide the `-Path` parameter.
-* The `Unprotect-CString` function now returns the decrypted text as a `[securestring]` by default instead of a
-  `[String]`. Use the `-AsPlainText` switch to get a plain text string back (not recommended).
+* Fixed: `Protect-CString` incorrectly marked as a filter instead of a function.
+* Fixed: `Protect-CString` and `Unprotect-CString` failed to handle encryption exceptions.
 '@
         } # End of PSData hashtable
 
