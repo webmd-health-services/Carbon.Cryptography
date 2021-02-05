@@ -1,5 +1,5 @@
 
-filter Protect-CString
+function Protect-CString
 {
     <#
     .SYNOPSIS
@@ -204,8 +204,52 @@ filter Protect-CString
         Set-StrictMode -Version 'Latest'
         Use-CallerPreference -Cmdlet $PSCmdlet -Session $ExecutionContext.SessionState
 
-        $stringBytes = $null
+        # We find and validate the certificate/key here so our try/catch block around actual encryption doesn't catch
+        # these errors.
+        [byte[]]$keyBytes = [byte[]]::New(0)
+        if( $PSCmdlet.ParameterSetName -like 'Rsa*' )
+        {
+            if( $PSCmdlet.ParameterSetName -eq 'RsaByThumbprint' )
+            {
+                $Certificate = Get-Item -Path ('cert:\*\*\{0}' -f $Thumbprint) | Select-Object -First 1
+                if( -not $Certificate )
+                {
+                    Write-Error "Certificate with thumbprint ""$($Thumbprint)"" not found."
+                    return
+                }
+            }
+            elseif( $PSCmdlet.ParameterSetName -eq 'RsaByPath' )
+            {
+                $Certificate = Get-CCertificate -Path $PublicKeyPath
+                if( -not $Certificate )
+                {
+                    return
+                }
+            }
+
+            $rsaKey = $Certificate.PublicKey.Key
+            if( -not $rsaKey.GetType().IsSubclassOf([Security.Cryptography.RSA]) )
+            {
+                $msg = "Certificate ""$($Certificate.Subject)"" ($($Certificate.Thumbprint)) is not an RSA public " +
+                    "key. Found a public key of type ""$($rsaKey.GetType().FullName)"", but expected type " +
+                    """$([Security.Cryptography.RSACryptoServiceProvider].FullName)""."
+                Write-Error $msg
+                return
+            }
+        }
+        elseif( $PSCmdlet.ParameterSetName -eq 'Symmetric' )
+        {
+            $keyBytes = ConvertTo-AesKey -InputObject $Key -From 'Protect-CString'
+            if( -not $keyBytes )
+            {
+                return
+            }
+        }
+
+
+        $stringBytes = [byte[]]::New(0)
         $unicodeBytes = [Text.Encoding]::Unicode.GetBytes( $String.ToString() )
+        [byte[]]$encryptedBytes = [byte[]]::New(0)
         try
         {
             if( $String -is [securestring] )
@@ -254,55 +298,22 @@ filter Protect-CString
             }
             elseif( $PSCmdlet.ParameterSetName -like 'Rsa*' )
             {
-                if( $PSCmdlet.ParameterSetName -eq 'RsaByThumbprint' )
-                {
-                    $Certificate = Get-Item -Path ('cert:\*\*\{0}' -f $Thumbprint) | Select-Object -First 1
-                    if( -not $Certificate )
-                    {
-                        Write-Error "Certificate with thumbprint ""$($Thumbprint)"" not found."
-                        return
-                    }
-                }
-                elseif( $PSCmdlet.ParameterSetName -eq 'RsaByPath' )
-                {
-                    $Certificate = Get-CCertificate -Path $PublicKeyPath
-                    if( -not $Certificate )
-                    {
-                        return
-                    }
-                }
-
-                $rsaKey = $Certificate.PublicKey.Key
-                if( -not $rsaKey.GetType().IsSubclassOf([Security.Cryptography.RSA]) )
-                {
-                    $msg = "Certificate ""$($Certificate.Subject)"" ($($Certificate.Thumbprint)) is not an RSA public " +
-                        "key. Found a public key of type ""$($rsaKey.GetType().FullName)"", but expected type " +
-                        """$([Security.Cryptography.RSACryptoServiceProvider].FullName)""."
-                    Write-Error $msg
-                    return
-                }
 
                 if( -not $Padding )
                 {
                     $Padding = [Security.Cryptography.RSAEncryptionPadding]::OaepSHA1
                 }
 
-                $encryptedBytes = $rsaKey.Encrypt($stringBytes, $Padding)
+                $encryptedBytes = $Certificate.PublicKey.Key.Encrypt($stringBytes, $Padding)
             }
             elseif( $PSCmdlet.ParameterSetName -eq 'Symmetric' )
             {
-                $Key = ConvertTo-AesKey -InputObject $Key -From 'Protect-CString'
-                if( -not $Key )
-                {
-                    return
-                }
-
                 $aes = [Security.Cryptography.Aes]::Create()
                 try
                 {
                     $aes.Padding = [Security.Cryptography.PaddingMode]::PKCS7
-                    $aes.KeySize = $Key.Length * 8
-                    $aes.Key = $Key
+                    $aes.KeySize = $keyBytes.Length * 8
+                    $aes.Key = $keyBytes
 
                     $memoryStream = [IO.MemoryStream]::New()
                     try
@@ -323,10 +334,10 @@ filter Protect-CString
                             $cryptoStream.Dispose()
                         }
 
-                        $encryptedBytes = Invoke-Command -ScriptBlock {
-                                                                        $aes.IV
-                                                                        $memoryStream.ToArray()
-                                                                    }
+                        $encryptedBytes = & {
+                                                $aes.IV
+                                                $memoryStream.ToArray()
+                                            }
                     }
                     finally
                     {
@@ -341,9 +352,26 @@ filter Protect-CString
 
             return [Convert]::ToBase64String( $encryptedBytes )
         }
+        catch
+        {
+            Write-Error -ErrorRecord $_ -ErrorAction $ErrorActionPreference
+        }
         finally
         {
-            $stringBytes.Clear()
+            if( $encryptedBytes )
+            {
+                $encryptedBytes.Clear()
+            }
+
+            if( $stringBytes )
+            {
+                $stringBytes.Clear()
+            }
+
+            if( $keyBytes )
+            {
+                $keyBytes.Clear()
+            }
         }
     }
 }
