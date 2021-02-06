@@ -231,3 +231,22 @@ foreach( $keySize in @( 128, 192, 256 ) )
         }
     }
 }
+
+Describe 'Protect-CString.when encryption fails' {
+    # Anyone know how to get DPAPI or AES encryption to fail?
+    Context 'RSA' {
+        It 'should fail' {
+            { 
+                $Global:Error.Clear()
+                # Definitely too big to be encrypted by RSA.
+                $plainText = 'a' * 1000
+                Protect-CString -String $plainText -PublicKeyPath $publicKeyFilePath -ErrorAction SilentlyContinue |
+                    Should -BeNullOrEmpty
+                # Different error message on different versions of .NET and different platforms
+                #                              WinPS 5.1 | PS Core 7            | Linux        | macOS
+                $Global:Error | Should -Match 'Bad Length|parameter is incorrect|data too large|message exceeds the maximum'
+            } |
+                Should -Not -Throw
+        }
+    }
+}

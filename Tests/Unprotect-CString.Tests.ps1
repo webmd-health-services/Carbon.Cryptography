@@ -164,3 +164,68 @@ Describe 'Unprotect-String.AES' {
     }
 }
 
+if( (Test-Path -Path 'cert:') )
+{
+    $certWithEmptyPrivateKey = 
+        Get-ChildItem -Path 'cert:\*\*\*' |
+        Where-Object 'HasPrivateKey' -eq $true |
+        Where-Object 'PrivateKey' -eq $null |
+        Select-Object -First 1
+
+    if( $certWithEmptyPrivateKey )
+    {
+        Describe 'Unprotect-CString.when user does not have access to private key' {
+            It 'should fail' {
+                { Unprotect-CString -ProtectedString 'doesn''t matter' -Thumbprint $certWithEmptyPrivateKey.Thumbprint -ErrorAction Stop } |
+                    Should -Throw 'has a private key, but it is null'
+            }
+        }
+    }
+}
+
+Describe 'Unprotect-CString.when decryption fails' {
+    if( (Test-COperatingSystem -IsWindows) )
+    {
+        Context 'DPAPI' {
+            It 'should fail' {
+                { 
+                    $Global:Error.Clear()
+                    Unprotect-CString -ProtectedString 'not encrypted' -ErrorAction SilentlyContinue |
+                        Should -BeNullOrEmpty
+                    $Global:Error | Should -Match 'parameter is incorrect'
+                } |
+                    Should -Not -Throw
+            }
+        }
+    }
+    Context 'RSA' {
+        It 'should fail' {
+            { 
+                $Global:Error.Clear()
+                Unprotect-CString -ProtectedString 'not encrypted' `
+                                  -PrivateKeyPath $privateKeyPath `
+                                  -ErrorAction SilentlyContinue |
+                    Should -BeNullOrEmpty
+                # Different error message on different versions of .NET.
+                $Global:Error | Should -Match 'decoding OAEP padding|length of the data to decrypt'
+            } |
+                Should -Not -Throw
+        }
+    }
+    Context 'AES' {
+        It 'should fail' {
+            { 
+                $Global:Error.Clear()
+                $key = 'passwordpasswordpasswordpassword'
+                $fakeCipherText =
+                    "$('iv' * 8)not encrypted)" | ConvertTo-CBase64 -Encoding ([Text.Encoding]::UTF8)
+                Unprotect-CString -ProtectedString $fakeCipherText `
+                                  -Key (ConvertTo-SecureString $key -AsPlainText -Force) `
+                                  -ErrorAction SilentlyContinue |
+                    Should -BeNullOrEmpty
+                $Global:Error | Should -Match 'input data is not a complete block' #head
+            } |
+                Should -Not -Throw
+        }
+    }
+}

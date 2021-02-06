@@ -258,8 +258,9 @@ function Unprotect-CString
                 $isRsa = $privateKeyType.IsSubclassOf([Security.Cryptography.RSA])
                 if( -not $isRsa )
                 {
-                    $msg = "$($certDesc) is not an RSA key. Found a private key of type ""$($privateKeyType.FullName)"", but " +
-                        "expected type ""$([Security.Cryptography.RSA].FullName)"" or one of its sub-types."
+                    $msg = "$($certDesc) is not an RSA key. Found a private key of type " +
+                           """$($privateKeyType.FullName)"", but expected type " +
+                           """$([Security.Cryptography.RSA].FullName)"" or one of its sub-types."
                     Write-Error -Message $msg -ErrorAction $ErrorActionPreference
                     return
                 }
@@ -340,7 +341,7 @@ function Unprotect-CString
         }
         catch
         {
-            Write-Error -ErrorRecrd $_ -ErrorAction $ErrorActionPreference
+            Write-Error -ErrorRecord $_ -ErrorAction $ErrorActionPreference
         }
         finally
         {
