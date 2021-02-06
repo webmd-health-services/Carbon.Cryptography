@@ -65,7 +65,17 @@ function ThenCertificateInstalled
         $In = 'My'
     )
 
-    $cert = Get-CCertificate -Thumbprint $WithThumbprint -StoreLocation $For -StoreName $In
+    $tries = 100
+    $cert = $null
+    for( $tryNum = 0; $tryNum -lt $tries; ++$tryNum )
+    {
+        $cert = Get-CCertificate -Thumbprint $WithThumbprint -StoreLocation $For -StoreName $In
+        if( $cert )
+        {
+            break
+        }
+        Start-Sleep -Milliseconds 100
+    }
     $cert | Should -Not -BeNullOrEmpty
     $cert.Thumbprint | Should -Be $WithThumbprint
 }
