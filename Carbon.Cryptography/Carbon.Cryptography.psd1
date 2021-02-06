@@ -17,7 +17,7 @@
     RootModule = 'Carbon.Cryptography.psm1'
 
     # Version number of this module.
-    ModuleVersion = '1.0.1'
+    ModuleVersion = '1.0.2'
 
     # ID used to uniquely identify this module
     GUID = '225b9f63-3e3e-406c-87a0-33d34f30cd8e'
@@ -134,8 +134,7 @@
 
             # ReleaseNotes of this module
             ReleaseNotes = @'
-* Fixed: `Protect-CString` incorrectly marked as a filter instead of a function.
-* Fixed: `Protect-CString` and `Unprotect-CString` failed to handle encryption exceptions.
+* Fixed: `Unprotect-CString` error handling fails when encryption fails.
 '@
         } # End of PSData hashtable
 
