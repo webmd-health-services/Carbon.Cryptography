@@ -11,7 +11,7 @@ if( -not $onWindows )
     return
 }
 
-$TestCertPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificate.cer' -Resolve
+$TestCertPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificate.pfx' -Resolve
 $TestCert = New-Object Security.Cryptography.X509Certificates.X509Certificate2 $TestCertPath
 
 # Some tests work with local machine stores, and thus require admin access.
@@ -27,6 +27,13 @@ $skipRemotingParam = @{
 
 function Init
 {
+    # Make sure there's no local machine cert "inheriting" down to the current user's store.
+    if( (Test-Path -Path "cert:\*\My\$($TestCert.Thumbprint)") )
+    {
+        Uninstall-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation LocalMachine -StoreName My
+        Uninstall-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -StoreName My
+    }
+
     if( -not (Test-Path Cert:\CurrentUser\My\$TestCert.Thumbprint -PathType Leaf) )
     {
         Install-CCertificate -Path $TestCertPath -StoreLocation CurrentUser -StoreName My
@@ -69,6 +76,8 @@ Describe 'Uninstall-CCertificate' {
 
     It 'should uninstall certificate from custom store' {
         Init
+        # Make sure there's no local machine cert "inheriting" down to the current user's store.
+        Uninstall-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation LocalMachine -CustomStoreName 'Carbon'
         $cert = Install-CCertificate -Path $TestCertPath -StoreLocation CurrentUser -CustomStoreName 'Carbon' -PassThru
         $cert | Should -Not -BeNullOrEmpty
         $certPath = 'Cert:\CurrentUser\Carbon\{0}' -f $cert.Thumbprint

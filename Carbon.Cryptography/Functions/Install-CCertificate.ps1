@@ -111,24 +111,31 @@ function Install-CCertificate
         $fileBytes = [IO.File]::ReadAllBytes($Path)
         $encodedCert = [Convert]::ToBase64String($fileBytes)
 
-        $keyFlags = [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::MachineKeySet
+        # Make sure loading the certificate doesn't leave temporary cruft around on the file system. We're only loading
+        # the cert to get its thumbprint.
+        $keyStorageFlags = @{}
         if( $StoreLocation -eq [Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser )
         {
-            $keyFlags = [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::UserKeySet
+            $keyStorageFlags['KeyStorageFlags'] = 
+                [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
         }
-        $keyFlags = $keyFlags -bor [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet
-    
-        if( $Exportable )
-        {
-            $keyFlags = $keyFlags -bor [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable
-        }
-
-        $Certificate = Get-CCertificate -Path $Path -Password $Password -KeyStorageFlags $keyFlags
+        $Certificate = Get-CCertificate -Path $Path -Password $Password @keyStorageFlags
     }
     else
     {
         $encodedCert = [Convert]::ToBase64String( $Certificate.RawData )
-        $keyFlags = 0
+    }
+
+    $keyFlags = [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::MachineKeySet
+    if( $StoreLocation -eq [Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser )
+    {
+        $keyFlags = [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::UserKeySet
+    }
+    $keyFlags = $keyFlags -bor [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet
+
+    if( $Exportable )
+    {
+        $keyFlags = $keyFlags -bor [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable
     }
 
     $invokeCommandArgs = @{ }
@@ -160,7 +167,9 @@ function Install-CCertificate
 
             [bool]$WhatIf,
 
-            [Management.Automation.ActionPreference]$Verbosity
+            [Management.Automation.ActionPreference]$Verbosity,
+            
+            [String]$Thumbprint
         )
 
         Set-StrictMode -Version 'Latest'
@@ -172,12 +181,6 @@ function Install-CCertificate
 
         try
         {
-            $certBytes = [Convert]::FromBase64String( $EncodedCertificate )
-            [IO.File]::WriteAllBytes( $certFilePath, $certBytes )
-
-            $cert = 
-                [Security.Cryptography.X509Certificates.X509Certificate2]::New($certFilePath, $Password, $KeyStorageFlags)
-
             if( $CustomStoreName )
             {
                 $store = [Security.Cryptography.X509Certificates.X509Store]::New($CustomStoreName, $StoreLocation)
@@ -193,7 +196,7 @@ function Install-CCertificate
                 $store.Open( ([Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly) )
                 try
                 {
-                    if( $store.Certificates | Where-Object { $_.Thumbprint -eq $cert.Thumbprint } )
+                    if( $store.Certificates | Where-Object 'Thumbprint' -eq $Thumbprint )
                     {
                         return
                     }
@@ -203,6 +206,12 @@ function Install-CCertificate
                     $store.Close()
                 }
             }
+
+            $certBytes = [Convert]::FromBase64String( $EncodedCertificate )
+            [IO.File]::WriteAllBytes( $certFilePath, $certBytes )
+
+            $cert = 
+                [Security.Cryptography.X509Certificates.X509Certificate2]::New($certFilePath, $Password, $KeyStorageFlags)
 
             $store.Open( ([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite) )
 
@@ -228,7 +237,7 @@ function Install-CCertificate
             Remove-Item -Path $certFilePath -ErrorAction Ignore -WhatIf:$false -Force
         }
 
-    } -ArgumentList $encodedCert,$Password,$StoreLocation,$StoreName,$CustomStoreName,$keyFlags,$Force,$WhatIfPreference,$VerbosePreference
+    } -ArgumentList $encodedCert,$Password,$StoreLocation,$StoreName,$CustomStoreName,$keyFlags,$Force,$WhatIfPreference,$VerbosePreference, $Certificate.Thumbprint
 
     if( $PassThru )
     {

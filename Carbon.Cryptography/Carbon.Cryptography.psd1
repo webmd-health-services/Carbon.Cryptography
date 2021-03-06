@@ -17,7 +17,7 @@
     RootModule = 'Carbon.Cryptography.psm1'
 
     # Version number of this module.
-    ModuleVersion = '1.0.2'
+    ModuleVersion = '1.0.3'
 
     # ID used to uniquely identify this module
     GUID = '225b9f63-3e3e-406c-87a0-33d34f30cd8e'
@@ -134,7 +134,10 @@
 
             # ReleaseNotes of this module
             ReleaseNotes = @'
-* Fixed: `Unprotect-CString` error handling fails when encryption fails.
+* Fixed: When installing certificates with private keys, the `Install-CCertificate` function causes Windows API to write
+extra files to the directories where private keys are saved.
+* Fixed: In some situations, the `Install-CCertificate` function, when passed a certificate object to install with a
+private key, would fail to install the private key.
 '@
         } # End of PSData hashtable
 
