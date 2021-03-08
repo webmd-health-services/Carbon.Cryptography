@@ -155,4 +155,19 @@ if( $Initialize )
 }
 
 $context = New-WhiskeyContext -Environment 'Dev' -ConfigurationPath $configPath
+$apiKeys = @{
+    'AppVeyorBearerToken' = 'WHS_APPVEYOR_BEARER_TOKEN';
+    'GitHubAccessToken' = 'WHS_GITHUB_ACCESS_TOKEN';
+    'PowerShellGalleryApiKey' = 'WHS_POWERSHELL_GALLERY_API_KEY';
+}
+foreach( $apiKeyName in $apiKeys.Keys )
+{
+    $envVarName = $apiKeys[$apiKeyName]
+    $path = "env:$($envVarName)"
+    if( -not (Test-Path -Path $path) )
+    {
+        continue
+    }
+    Add-WhiskeyApiKey -Context $context -ID $apiKeyName -Value (Get-Item -Path $path).Value
+}
 Invoke-WhiskeyBuild -Context $context @optionalArgs

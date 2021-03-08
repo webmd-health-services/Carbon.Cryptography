@@ -178,13 +178,11 @@ function Unprotect-CString
         Set-StrictMode -Version 'Latest'
         Use-CallerPreference -Cmdlet $PSCmdlet -Session $ExecutionContext.SessionState
 
-        [byte[]]$decryptedBytes = $null
-        [byte[]]$encryptedBytes = [Convert]::FromBase64String($ProtectedString)
-        if( $PSCmdlet.ParameterSetName -eq 'DPAPI' )
-        {
-            $decryptedBytes = [Security.Cryptography.ProtectedData]::Unprotect( $encryptedBytes, $null, 0 )
-        }
-        elseif( $PSCmdlet.ParameterSetName -like 'RSA*' )
+        [byte[]]$keyBytes = [byte[]]::New(0)
+
+        # Find and validate the RSA certificate, if needed. We do it here so our try/catch around the actual 
+        # decryption doesn't handle these errors.
+        if( $PSCmdlet.ParameterSetName -like 'RSA*' )
         {
             if( $PSCmdlet.ParameterSetName -notlike '*ByCertificate' )
             {
@@ -204,8 +202,8 @@ function Unprotect-CString
                 if( $count -gt 1 )
                 {
                     $msg = "Found $($count) certificates at ""$($PrivateKeyPath)"". Arbitrarily choosing the first " +
-                           'one. If you get errors, consider passing the exact path to the certificate you want to ' +
-                           'the "Unprotect-CString" function''s "PrivateKeyPath" parameter.'
+                        'one. If you get errors, consider passing the exact path to the certificate you want to ' +
+                        'the "Unprotect-CString" function''s "PrivateKeyPath" parameter.'
                     Write-Warning -Message $msg
                 }
                 $Certificate = $certificates | Select-Object -First 1
@@ -234,85 +232,98 @@ function Unprotect-CString
                 Write-Error -Message $msg -ErrorAction $ErrorActionPreference
                 return
             }
-
-            [Security.Cryptography.RSA]$privateKey = $null
-            $privateKeyType = $Certificate.PrivateKey.GetType()
-            $isRsa = $privateKeyType.IsSubclassOf([Security.Cryptography.RSA])
-            if( -not $isRsa )
-            {
-                $msg = "$($certDesc) is not an RSA key. Found a private key of type ""$($privateKeyType.FullName)"", but " +
-                    "expected type ""$([Security.Cryptography.RSA].FullName)"" or one of its sub-types."
-                Write-Error -Message $msg -ErrorAction $ErrorActionPreference
-                return
-            }
-
-            if( -not $Padding )
-            {
-                $Padding = [Security.Cryptography.RSAEncryptionPadding]::OaepSHA1
-            }
-
-            $privateKey = $Certificate.PrivateKey
-            $decryptedBytes = $privateKey.Decrypt($encryptedBytes, $padding)
         }
         elseif( $PSCmdlet.ParameterSetName -eq 'Symmetric' )
         {
-            $Key = ConvertTo-AesKey -InputObject $Key -From 'Unprotect-CString'
-            if( -not $Key )
+            $keyBytes = ConvertTo-AesKey -InputObject $Key -From 'Unprotect-CString'
+            if( -not $keyBytes )
             {
                 return
             }
+        }
 
-            $aes = [Security.Cryptography.Aes]::Create()
-            try
+
+        [byte[]]$decryptedBytes = [byte[]]::New(0)
+        [byte[]]$encryptedBytes = [Convert]::FromBase64String($ProtectedString)
+        try
+        {
+            if( $PSCmdlet.ParameterSetName -eq 'DPAPI' )
             {
-                $aes.Padding = [Security.Cryptography.PaddingMode]::PKCS7
-                $aes.KeySize = $Key.Length * 8
-                $aes.Key = $Key
-                $iv = [byte[]]::New($aes.IV.Length)
-                [Array]::Copy($encryptedBytes, $iv, 16)
+                $decryptedBytes = [Security.Cryptography.ProtectedData]::Unprotect( $encryptedBytes, $null, 0 )
+            }
+            elseif( $PSCmdlet.ParameterSetName -like 'RSA*' )
+            {
+                [Security.Cryptography.RSA]$privateKey = $null
+                $privateKeyType = $Certificate.PrivateKey.GetType()
+                $isRsa = $privateKeyType.IsSubclassOf([Security.Cryptography.RSA])
+                if( -not $isRsa )
+                {
+                    $msg = "$($certDesc) is not an RSA key. Found a private key of type " +
+                           """$($privateKeyType.FullName)"", but expected type " +
+                           """$([Security.Cryptography.RSA].FullName)"" or one of its sub-types."
+                    Write-Error -Message $msg -ErrorAction $ErrorActionPreference
+                    return
+                }
 
-                $encryptedBytes = $encryptedBytes[16..($encryptedBytes.Length - 1)]
-                $encryptedStream = New-Object -TypeName 'IO.MemoryStream' -ArgumentList (,$encryptedBytes)
+                if( -not $Padding )
+                {
+                    $Padding = [Security.Cryptography.RSAEncryptionPadding]::OaepSHA1
+                }
+
+                $privateKey = $Certificate.PrivateKey
+                $decryptedBytes = $privateKey.Decrypt($encryptedBytes, $padding)
+            }
+            elseif( $PSCmdlet.ParameterSetName -eq 'Symmetric' )
+            {
+                $aes = [Security.Cryptography.Aes]::Create()
                 try
                 {
-                    $cryptoStream =
-                        [Security.Cryptography.CryptoStream]::New($encryptedStream,
-                            $aes.CreateDecryptor($aes.Key, $iv),
-                            ([Security.Cryptography.CryptoStreamMode]::Read))
+                    $aes.Padding = [Security.Cryptography.PaddingMode]::PKCS7
+                    $aes.KeySize = $keyBytes.Length * 8
+                    $aes.Key = $keyBytes
+                    $iv = [byte[]]::New($aes.IV.Length)
+                    [Array]::Copy($encryptedBytes, $iv, 16)
+
+                    $encryptedBytes = $encryptedBytes[16..($encryptedBytes.Length - 1)]
+                    $encryptedStream = New-Object -TypeName 'IO.MemoryStream' -ArgumentList (,$encryptedBytes)
                     try
                     {
-                        $streamReader = [IO.StreamReader]::New($cryptoStream)
+                        $cryptoStream =
+                            [Security.Cryptography.CryptoStream]::New($encryptedStream,
+                                $aes.CreateDecryptor($aes.Key, $iv),
+                                ([Security.Cryptography.CryptoStreamMode]::Read))
                         try
                         {
-                            [byte[]]$decryptedBytes = [Text.Encoding]::UTF8.GetBytes($streamReader.ReadToEnd())
+                            $streamReader = [IO.StreamReader]::New($cryptoStream)
+                            try
+                            {
+                                [byte[]]$decryptedBytes = [Text.Encoding]::UTF8.GetBytes($streamReader.ReadToEnd())
+                            }
+                            finally
+                            {
+                                $streamReader.Dispose()
+                            }
                         }
                         finally
                         {
-                            $streamReader.Dispose()
+                            $cryptoStream.Dispose()
                         }
                     }
                     finally
                     {
-                        $cryptoStream.Dispose()
+                        $encryptedStream.Dispose()
                     }
                 }
                 finally
                 {
-                    $encryptedStream.Dispose()
+                    $aes.Dispose()
                 }
             }
-            finally
-            {
-                $aes.Dispose()
-            }
-        }
 
-        try
-        {
             $decryptedBytes = [Text.Encoding]::Convert([Text.Encoding]::UTF8, [Text.Encoding]::Unicode, $decryptedBytes)
             if( $AsPlainText )
             {
-                [Text.Encoding]::Unicode.GetString($decryptedBytes)
+                return [Text.Encoding]::Unicode.GetString($decryptedBytes)
             }
             else
             {
@@ -328,9 +339,26 @@ function Unprotect-CString
                 return $secureString
             }
         }
+        catch
+        {
+            Write-Error -ErrorRecord $_ -ErrorAction $ErrorActionPreference
+        }
         finally
         {
-            [Array]::Clear( $decryptedBytes, 0, $decryptedBytes.Length )
+            if( $decryptedBytes )
+            {
+                $decryptedBytes.Clear()
+            }
+
+            if( $encryptedBytes )
+            {
+                $encryptedBytes.Clear()
+            }
+
+            if( $keyBytes )
+            {
+                $keyBytes.Clear()
+            }
         }
     }
 }

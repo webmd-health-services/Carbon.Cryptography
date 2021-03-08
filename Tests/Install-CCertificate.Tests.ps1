@@ -4,10 +4,11 @@ Set-StrictMode -Version 'Latest'
 
 & (Join-Path -Path $PSScriptRoot -ChildPath 'Initialize-Test.ps1' -Resolve)
 
-$testCertPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificate.cer' -Resolve
+$testCertPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificate.pfx' -Resolve
 $testCert = New-Object 'Security.Cryptography.X509Certificates.X509Certificate2' $testCertPath
-$TestCertProtectedPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificateWithPassword.cer' -Resolve
-$testCertProtected = New-Object 'Security.Cryptography.X509Certificates.X509Certificate2' $TestCertProtectedPath,'password'
+$password = ConvertTo-SecureString -String 'password' -AsPlainText -Force
+$TestCertProtectedPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificateWithPassword.pfx' -Resolve
+$testCertProtected = New-Object 'Security.Cryptography.X509Certificates.X509Certificate2' $TestCertProtectedPath, $password
 
 $onWindows = Test-COperatingSystem -IsWindows
 
@@ -27,18 +28,24 @@ $output = $null
 function Init
 {
     $Global:Error.Clear()
-
     $script:output = $null
+    Reset
+}
 
-    if( (Get-CCertificate -Thumbprint $testCert.Thumbprint -StoreLocation CurrentUser -StoreName My) )
-    {
-        Uninstall-CCertificate -Certificate $testCert -StoreLocation CurrentUser -StoreName My
-    }
+function Measure-PhysicalStore
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [Security.Cryptography.X509Certificates.StoreLocation]$Location
+    )
 
-    if( (Get-CCertificate -Thumbprint $testCertProtected.Thumbprint -StoreLocation CurrentUser -StoreName My) )
+    $path = Join-Path -Path $env:APPDATA -ChildPath 'Microsoft\Crypto\RSA\*\*'
+    if( $Location -eq [Security.Cryptography.X509Certificates.StoreLocation]::LocalMachine )
     {
-        Uninstall-CCertificate -Certificate $testCertProtected -StoreLocation CurrentUser -StoreName My
+        $path = Join-Path -Path $env:ProgramData -ChildPath 'Microsoft\Crypto\RSA\MachineKeys'
     }
+    Get-ChildItem -Path $path -ErrorAction Ignore | Measure-Object | Select-Object -ExpandProperty 'Count'
 }
 
 function Reset
@@ -65,7 +72,17 @@ function ThenCertificateInstalled
         $In = 'My'
     )
 
-    $cert = Get-CCertificate -Thumbprint $WithThumbprint -StoreLocation $For -StoreName $In
+    $tries = 100
+    $cert = $null
+    for( $tryNum = 0; $tryNum -lt $tries; ++$tryNum )
+    {
+        $cert = Get-CCertificate -Thumbprint $WithThumbprint -StoreLocation $For -StoreName $In
+        if( $cert )
+        {
+            break
+        }
+        Start-Sleep -Milliseconds 100
+    }
     $cert | Should -Not -BeNullOrEmpty
     $cert.Thumbprint | Should -Be $WithThumbprint
 }
@@ -114,7 +131,10 @@ function WhenInstalling
 
         [Management.Automation.Runspaces.PSSession]$OverSession,
 
-        [switch]$WhatIf
+        [switch]$WhatIf,
+
+        [Parameter(ParameterSetName='FromFile')]
+        [securestring]$WithPassword
     )
 
     $conditionalParams = @{}
@@ -163,159 +183,210 @@ function WhenInstalling
         $conditionalParams['WhatIf'] = $true
     }
 
+    if( $WithPassword )
+    {
+        $conditionalParams['Password'] = $WithPassword
+    }
+
     $output = $null
     Install-CCertificate -StoreLocation $For @conditionalParams |
         Tee-Object -Variable 'output'
     $script:output = $output
 }
 
+$locations = & {
+    'CurrentUser'
+    if( (Test-IsAdministrator) -and $onWindows )
+    {
+        'LocalMachine'
+    }
+}
+
 Describe "Install-CCertificate" {
     BeforeEach { Init }
     AfterEach { Reset }
 
-    It 'should install certificate to local machine' {
-        WhenInstalling -FromFile $testCertPath -For 'CurrentUser' -In 'My'
-        ThenCertificateInstalled $testCert.Thumbprint -For 'CurrentUser' -In 'My' 
-        ThenNothingReturned
-        $cert = Get-CCertificate -Thumbprint $testCert.Thumbprint -StoreLocation 'CurrentUser' -StoreName 'My'
-        {
-            $cert.Export( [Security.Cryptography.X509Certificates.X509ContentType]::Pfx ) | Out-Null
-        } | Should -Throw
-    }
+    foreach( $location in $locations )
+    {
+        Context "for $($location)" {
+            It 'should install certificate from a file' {
+                WhenInstalling -FromFile $testCertPath -For $location -In 'My'
+                ThenCertificateInstalled $testCert.Thumbprint -For $location -In 'My' 
+                ThenNothingReturned
+                $cert = Get-CCertificate -Thumbprint $testCert.Thumbprint -StoreLocation $location -StoreName 'My'
+                {
+                    $cert.Export( [Security.Cryptography.X509Certificates.X509ContentType]::Pfx ) | Out-Null
+                } | Should -Throw
+            }
 
-    It 'should install certificate to local machine with relative path' {
-        Push-Location -Path $PSScriptRoot
-        try
-        {
-            $path = '.\Resources\{0}' -f (Split-Path -Leaf -Path $testCertPath)
-            WhenInstalling -FromFile $path -For 'CurrentUser' -In 'My'
-            ThenNothingReturned
-            ThenCertificateInstalled $testCert.Thumbprint -For 'CurrentUser' -In 'My' 
+            It 'should install certificate from a file with relative path' {
+                Push-Location -Path $PSScriptRoot
+                try
+                {
+                    $path = '.\Resources\{0}' -f (Split-Path -Leaf -Path $testCertPath)
+                    WhenInstalling -FromFile $path -For $location -In 'My'
+                    ThenNothingReturned
+                    ThenCertificateInstalled $testCert.Thumbprint -For $location -In 'My' 
+                }
+                finally
+                {
+                    Pop-Location
+                }
+            }
+
+            It 'should install certificate as exportable' {
+                WhenInstalling -FromFile $testCertPath -For $location -In 'My' -ThatIsExportable
+                ThenNothingReturned
+                ThenCertificateInstalled $testCert.Thumbprint -For $location -In 'My' 
+                $cert = Get-CCertificate -Thumbprint $testCert.Thumbprint -StoreLocation $location -StoreName 'My'
+                $cert | Should -Not -BeNullOrEmpty
+                $bytes = $cert.Export( [Security.Cryptography.X509Certificates.X509ContentType]::Pfx )
+                $bytes | Should -Not -BeNullOrEmpty
+            }
+
+            It 'should install certificate' {
+                WhenInstalling $testCert -For $location -In 'My'
+                ThenNothingReturned
+                ThenCertificateInstalled $testCert.Thumbprint -For $location -In 'My'
+            }
+
+            It 'should install password protected certificate' {
+                $fileCount = Measure-PhysicalStore -Location $location
+                WhenInstalling -FromFile $TestCertProtectedPath -WithPassword $password -For $location -In 'My'
+                ThenNothingReturned
+                ThenCertificateInstalled $testCertProtected.Thumbprint -For $location -In 'My'
+                Measure-PhysicalStore -Location $location | Should -Be ($fileCount + 1)
+            }
+
+            It 'should install certificate in remote computer' @skipRemotingParam {
+                $session = New-PSSession -ComputerName $env:COMPUTERNAME
+                try
+                {
+                    WhenInstalling $testCert -For $location -In 'My' -OverSession $session
+                    ThenNothingReturned
+                    ThenCertificateInstalled $testCert.Thumbprint -For $location -In 'My'
+                }
+                finally
+                {
+                    Remove-PSSession -Session $session
+                }
+            }
+
+            It 'should support ShouldProcess' {
+                WhenInstalling -FromFile $testCertPath -For $location -In 'My' -WhatIf
+                ThenNothingReturned
+                Join-Path -Path "cert:\$($location)\My" -ChildPath $testCert.Thumbprint |
+                    Should -Not -Exist
+            }
         }
-        finally
-        {
-            Pop-Location
-        }
-    }
-
-    It 'should install certificate to local machine as exportable' {
-        WhenInstalling -FromFile $testCertPath -For 'CurrentUser' -In 'My' -ThatIsExportable
-        ThenNothingReturned
-        ThenCertificateInstalled $testCert.Thumbprint -For 'CurrentUser' -In 'My' 
-        $cert = Get-CCertificate -Thumbprint $testCert.Thumbprint -StoreLocation 'CurrentUser' -StoreName 'My'
-        $cert | Should -Not -BeNullOrEmpty
-        $bytes = $cert.Export( [Security.Cryptography.X509Certificates.X509ContentType]::Pfx )
-        $bytes | Should -Not -BeNullOrEmpty
-    }
-
-    It 'should install certificate' {
-        WhenInstalling $testCert -For 'CurrentUser' -In 'My'
-        ThenNothingReturned
-        ThenCertificateInstalled $testCert.Thumbprint -For 'CurrentUser' -In 'My'
-    }
-
-    It 'should install password protected certificate' {
-        WhenInstalling $testCertProtected -For 'CurrentUser' -In 'My'
-        ThenNothingReturned
-        ThenCertificateInstalled $testCertProtected.Thumbprint -For 'CurrentUser' -In 'My'
-    }
-
-    It 'should install certificate in remote computer' @skipRemotingParam {
-        $session = New-PSSession -ComputerName $env:COMPUTERNAME
-        try
-        {
-            WhenInstalling $testCert -For 'CurrentUser' -In 'My' -OverSession $session
-            ThenNothingReturned
-            ThenCertificateInstalled $testCert.Thumbprint -For 'CurrentUser' -In 'My'
-        }
-        finally
-        {
-            Remove-PSSession -Session $session
-        }
-    }
-
-    It 'should support ShouldProcess' {
-        WhenInstalling -FromFile $testCertPath -For 'CurrentUser' -In 'My' -WhatIf
-        ThenNothingReturned
-        Join-Path -Path 'cert:\CurrentUser\My' -ChildPath $testCert.Thumbprint |
-            Should -Not -Exist
     }
 }
 
-Describe 'Install-CCertificate.when installing in custom store' {
-    AfterEach { Reset }
-    It 'should install certificate in the custom store' {
-        Init
-        $certInstallPath = Join-Path -Path 'cert:\CurrentUser\SharePoint' -ChildPath $testCert.Thumbprint
-        Uninstall-CCertificate -Thumbprint $testCert.Thumbprint -StoreLocation 'CurrentUser' -CustomStoreName 'SharePoint'
-        $certInstallPath | Should -Not -Exist
-        WhenInstalling -FromFile $testCertPath -For 'CurrentUser' -In 'SharePoint'
-        ThenNothingReturned
-        $certInstallPath | Should -Exist
-    }
-}
-
-Describe 'Install-CCertificate.when certificate is already installed' {
-    AfterEach { Reset }
-    It 'should not re-install it' {
-        Init
-        $output =
-            WhenInstalling $testCert -For 'CurrentUser' -In 'My' -Verbose 4>&1 |
-            Where-Object { $_ -is [Management.Automation.VerboseRecord] }
-        $output | Should -HaveCount 1
-        $output.Message | Should -Match 'Installing certificate'
-        ThenCertificateInstalled $testCert.Thumbprint -For 'CurrentUser' -In 'My'
-        ThenNoError
-
-        # Install it again.
-        $output = 
-            WhenInstalling $testCert -For 'CurrentUser' -In 'My' -Verbose 4>&1 |
-            Where-Object { $_ -is [Management.Automation.VerboseRecord] }
-        $output | Should -BeNullOrEmpty -Because 'certificates shouldn''t get re-installed'
-        ThenNoError
-        ThenCertificateInstalled $testCert.Thumbprint -For 'CurrentUser' -In 'My'
-    }
-}
-
-Describe 'Install-CCertificate.when certificate is already installed and forcing install' {
-    AfterEach { Reset }
-    It 'should not re-install it' {
-        Init
-        $output =
-            WhenInstalling $testCert -For 'CurrentUser' -In 'My' -Verbose 4>&1 |
-            Where-Object { $_ -is [Management.Automation.VerboseRecord] }
-        ThenNoError
-        $output | Should -HaveCount 1
-        $output.Message | Should -Match 'Installing certificate'
-        ThenCertificateInstalled $testCert.Thumbprint -For 'CurrentUser' -In 'My'
-
-        # Install it again.
-        $output = 
-            WhenInstalling $testCert -For 'CurrentUser' -In 'My' -WithForce -Verbose 4>&1 |
-            Where-Object { $_ -is [Management.Automation.VerboseRecord] }
-        ThenNoError
-        $output | Should -HaveCount 1
-        $output.Message | Should -Match 'Installing certificate'
-        ThenCertificateInstalled $testCert.Thumbprint -For 'CurrentUser' -In 'My'
-    }
-}
-
-Describe 'Install-CCertificate.when requesting the installed certificate be returned' {
-    AfterEach { Reset }
-    Context 'certificate is not installed' {
-        It 'should return the certificate' {
+foreach( $location in $locations )
+{
+    Describe "Install-CCertificate.$($location).when installing in custom store" {
+        AfterEach { Reset }
+        It 'should install certificate in the custom store' {
             Init
-            WhenInstalling $testCert -For 'CurrentUser' -In 'My' -ReturningCertificate
-            ThenCertificateReturned $testCert.Thumbprint
+            $certInstallPath = Join-Path -Path "cert:\$($location)\Carbon" -ChildPath $testCert.Thumbprint
+            # Certs in local machine stores (except "My") are inherited into user stores, so delete any certs in the
+            # local machine store first.
+            Uninstall-CCertificate -Thumbprint $testCert.Thumbprint `
+                                   -StoreLocation 'LocalMachine' `
+                                   -CustomStoreName 'Carbon'
+            Uninstall-CCertificate -Thumbprint $testCert.Thumbprint `
+                                   -StoreLocation 'CurrentUser' `
+                                   -CustomStoreName 'Carbon'
+            $certInstallPath | Should -Not -Exist
+            WhenInstalling -FromFile $testCertPath -For $location -In 'Carbon'
+            ThenNothingReturned
+
+            $duration = [Diagnostics.Stopwatch]::StartNew()
+            $timeout = [TimeSpan]::New(0, 0, 10)
+            do
+            {
+                if( (Test-Path -Path $certInstallPath) )
+                {
+                    break
+                }
+
+                Write-Verbose "Couldn't find $($location)\Carbon\$($ExpectedCertificate.Thumbprint). Trying again in 100ms." -Verbose
+                Start-Sleep -Milliseconds 100
+            }
+            while( $duration.Elapsed -lt $timeout )
+            $duration.Stop()
+            $duration = $null
+
+            $certInstallPath | Should -Exist
         }
     }
-    Context 'certificate is installed' {
-        It 'should return the certificate' {
+
+    Describe "Install-CCertificate.$($location).when certificate is already installed" {
+        AfterEach { Reset }
+        It 'should not re-install it' {
+            $fileCount = Measure-PhysicalStore -Location $location
             Init
-            WhenInstalling $testCert -For 'CurrentUser' -In 'My'
-            ThenNothingReturned
-            WhenInstalling $testCert -For 'CurrentUser' -In 'My' -ReturningCertificate
-            ThenCertificateReturned $testCert.Thumbprint
+            $output =
+                WhenInstalling -FromFile $testCertPath -For $location -In 'My' -Verbose 4>&1 |
+                Where-Object { $_ -is [Management.Automation.VerboseRecord] }
+            $output | Should -HaveCount 1
+            $output.Message | Should -Match 'Installing certificate'
+            ThenCertificateInstalled $testCert.Thumbprint -For $location -In 'My'
+            ThenNoError
+
+            # Install it again.
+            $output = 
+                WhenInstalling -FromFile $testCertPath -For $location -In 'My' -Verbose 4>&1 |
+                Where-Object { $_ -is [Management.Automation.VerboseRecord] }
+            $output | Should -BeNullOrEmpty -Because 'certificates shouldn''t get re-installed'
+            ThenNoError
+            ThenCertificateInstalled $testCert.Thumbprint -For $location -In 'My'
+            Measure-PhysicalStore -Location $location | Should -Be ($fileCount + 1)
+        }
+    }
+
+    Describe "Install-CCertificate.$($location).when certificate is already installed and forcing install" {
+        AfterEach { Reset }
+        It 'should not re-install it' {
+            $fileCount = Measure-PhysicalStore -Location $location
+            Init
+            $output =
+                WhenInstalling -FromFile $testCertPath -For $location -In 'My' -Verbose 4>&1 |
+                Where-Object { $_ -is [Management.Automation.VerboseRecord] }
+            ThenNoError
+            $output | Should -HaveCount 1
+            $output.Message | Should -Match 'Installing certificate'
+            ThenCertificateInstalled $testCert.Thumbprint -For $location -In 'My'
+
+            # Install it again.
+            $output = 
+                WhenInstalling -FromFile $testCertPath -For $location -In 'My' -WithForce -Verbose 4>&1 |
+                Where-Object { $_ -is [Management.Automation.VerboseRecord] }
+            ThenNoError
+            $output | Should -HaveCount 1
+            $output.Message | Should -Match 'Installing certificate'
+            ThenCertificateInstalled $testCert.Thumbprint -For $location -In 'My'
+            Measure-PhysicalStore -Location $location | Should -Be ($fileCount + 2)
+        }
+    }
+
+    Describe "Install-CCertificate.$($location).when requesting the installed certificate be returned" {
+        AfterEach { Reset }
+        Context 'certificate is not installed' {
+            It 'should return the certificate' {
+                Init
+                WhenInstalling $testCert -For $location -In 'My' -ReturningCertificate
+                ThenCertificateReturned $testCert.Thumbprint
+            }
+        }
+        Context 'certificate is installed' {
+            It 'should return the certificate' {
+                Init
+                WhenInstalling $testCert -For $location -In 'My'
+                ThenNothingReturned
+                WhenInstalling $testCert -For $location -In 'My' -ReturningCertificate
+                ThenCertificateReturned $testCert.Thumbprint
+            }
         }
     }
 }
