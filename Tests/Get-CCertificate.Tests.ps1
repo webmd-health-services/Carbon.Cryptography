@@ -4,7 +4,7 @@ Set-StrictMode -Version 'Latest'
 
 & (Join-Path -Path $PSScriptRoot -ChildPath 'Initialize-Test.ps1' -Resolve)
 
-$testCertPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificate.cer' -Resolve
+$testCertPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificate.pfx' -Resolve
 $TestCert = New-Object Security.Cryptography.X509Certificates.X509Certificate2 $testCertPath
 $testCertificateThumbprint = '7D5CE4A8A5EC059B829ED135E9AD8607977691CC'
 $testCertFriendlyName = 'Pup Test Certificate'
@@ -163,7 +163,7 @@ Describe 'Get-CCertificate' {
     
     It 'should get password protected certificate' {
         Init
-        $certPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificateWithPassword.cer' -Resolve
+        $certPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificateWithPassword.pfx' -Resolve
         [Security.Cryptography.X509Certificates.X509Certificate2]$cert = 
             Get-CCertificate -Path $certPath -Password (ConvertTo-SecureString 'password' -AsPlainText -Force)
         $Global:Error.Count | Should -Be 0
@@ -177,7 +177,7 @@ Describe 'Get-CCertificate' {
     
     It 'should include exception when failing to load certificate' {
         Init
-        $cert = Get-CCertificate -Path (Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificateWithPassword.cer') -ErrorAction SilentlyContinue
+        $cert = Get-CCertificate -Path (Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificateWithPassword.pfx') -ErrorAction SilentlyContinue
         $Global:Error.Count | Should -BeGreaterThan 0
         $Global:Error[0] | Should -Match 'password'
         $cert | Should -BeNullOrEmpty
