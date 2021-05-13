@@ -30,7 +30,7 @@ $passwordPath = Join-Path -Path $PSScriptRoot -ChildPath 'Tests\.password'
 if( -not (Test-Path -Path $passwordPath) )
 {
     $rng = [Security.Cryptography.RNGCryptoServiceProvider]::New()
-    $randomBytes = [byte[]]::New(9)
+    $randomBytes = [byte[]]::New(12)
     do 
     {
         Write-Verbose -Message ('Generating random password for test accounts.')
@@ -38,7 +38,7 @@ if( -not (Test-Path -Path $passwordPath) )
         $password = [Convert]::ToBase64String($randomBytes)
     }
     # Password needs to contain uppercase letter, lowercase letter, and a number.
-    while( $password -cnotmatch '[A-Z]' -and $password -cnotmatch '[a-z]' -and $password -notmatch '\d' )
+    while( $password -cnotmatch '[A-Z]' -and $password -cnotmatch '[a-z]' -and $password -notmatch '\d' -and $password -notmatch '\+|\/' )
     $password | Set-Content -Path $passwordPath
 
     Write-Verbose -Message ('Generating IV for encrypting test account password on Linux.')
