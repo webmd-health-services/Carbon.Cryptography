@@ -213,8 +213,17 @@ function Unprotect-CString
                     }
                     elseif( $privateKeyCount -eq 0 )
                     {
+
+                        $installedInCertStoreMsg = ''
+                        if ($PSCmdlet.ParameterSetName -eq 'RSAByThumbprint')
+                        {
+                            $installedInCertStoreMsg =
+                                'This is usually because the certificate was installed without a private key or the ' +
+                                'current user doesn''t have permission to read the private key.'
+                        }
+
                         "Found $($count) certificates at ""$($PrivateKeyPath)"" but none of them contain a private " +
-                        'key or the private key is null.' | Write-Error
+                        "key or the private key is null.$(' ' + $installedInCertStoreMsg)" | Write-Error
                         return
                     }
                 }
