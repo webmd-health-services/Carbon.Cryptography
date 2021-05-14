@@ -14,9 +14,40 @@ $privateKey2Path = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTes
 
 $rsaCipherText = Protect-CString -String $secret -PublicKeyPath $privateKeyPath
 
+function Reset
+{
+    # Uninstall-CCertificate only works on Windows
+    if( -not (Test-COperatingSystem -IsWindows) )
+    {
+        return
+    }
+
+    # Uninstall the test certs from all locations and stores
+    $certsToUninstall = @($publicKeyPath, $publicKey2Path)
+    foreach ($cert in $certsToUninstall)
+    {
+        $thumbprint = Get-CCertificate -Path $cert | Select-Object -ExpandProperty 'Thumbprint'
+        $storeLocations = [enum]::GetValues([System.Security.Cryptography.X509Certificates.StoreLocation])
+
+        foreach ($location in $storeLocations)
+        {
+            $storeNames = [enum]::GetValues([System.Security.Cryptography.X509Certificates.StoreName])
+
+            foreach ($name in $storeNames)
+            {
+                Uninstall-CCertificate -Thumbprint $thumbprint -StoreLocation $location -StoreName $name
+            }
+        }
+    }
+}
+
 Describe 'Unprotect-CString' {
     BeforeEach {
         $Global:Error.Clear()
+    }
+
+    AfterEach {
+        Reset
     }
 
     if( (Test-COperatingSystem -IsWindows) )
@@ -51,13 +82,21 @@ Describe 'Unprotect-CString' {
             $secrets[3] | Convert-CSecureStringToString | Should -Be 'Bar'
         }
 
+        It 'should convert to plain text' {
+            $originalText = [Guid]::NewGuid().ToString()
+            $protectedText = Protect-CString -String $originalText -ForUser
+            $plainText = Unprotect-CString -ProtectedString $protectedText -AsPlainText
+            $plainText | Should -BeOfType ([String])
+            $plainText | Should -Be $originalText
+        }
+
         It 'should handle thumbprint to cert with no private key' {
-            $cert = Get-ChildItem -Path 'cert:\*\*' -Recurse |
-                        Where-Object { $_.PublicKey.Key -is [Security.Cryptography.RSA] } |
-                        Where-Object { -not $_.HasPrivateKey } |
-                        Select-Object -First 1
+            $cert = Install-CCertificate -Path $publicKeyPath -StoreLocation CurrentUser -StoreName My -PassThru
             $cert | Should -Not -BeNullOrEmpty
-            $revealedSecret = Unprotect-CString -ProtectedString $rsaCipherText -Thumbprint $cert.Thumbprint -ErrorAction SilentlyContinue
+            $revealedSecret = Unprotect-CString -ProtectedString $rsaCipherText `
+                                                -Thumbprint $cert.Thumbprint `
+                                                -ErrorAction SilentlyContinue `
+                                                -WarningAction SilentlyContinue
             $Global:Error.Count | Should -BeGreaterThan 0
             $Global:Error[0] | Should -Match 'doesn''t have a private key'
             $revealedSecret | Should -BeNullOrEmpty
@@ -65,38 +104,49 @@ Describe 'Unprotect-CString' {
 
         It 'should decrypt with path to cert in store' {
             $cert = Install-CCertificate -Path $privateKeyPath -StoreLocation CurrentUser -StoreName My -PassThru
-            try
-            {
-                $revealedSecret = Unprotect-CString -ProtectedString $rsaCipherText -PrivateKeyPath ('cert:\CurrentUser\My\{0}' -f $cert.Thumbprint)
-                $Global:Error.Count | Should -Be 0
-                $revealedSecret | Convert-CSecureStringToString | Should -Be $secret
-            }
-            finally
-            {
-                Uninstall-CCertificate -Thumbprint $cert.Thumbprint -StoreLocation CurrentUser -StoreName My
-            }
+            $revealedSecret = Unprotect-CString -ProtectedString $rsaCipherText -PrivateKeyPath ('cert:\CurrentUser\My\{0}' -f $cert.Thumbprint)
+            $Global:Error.Count | Should -Be 0
+            $revealedSecret | Convert-CSecureStringToString | Should -Be $secret
         }
 
         It 'should decrypt with thumbprint' {
             $cert = Install-CCertificate -Path $privateKeyPath -StoreLocation CurrentUser -StoreName My -PassThru
-            try
-            {
-                $revealedSecret = Unprotect-CString -ProtectedString $rsaCipherText -Thumbprint $cert.Thumbprint
-                $Global:Error.Count | Should -Be 0
-                $revealedSecret | Convert-CSecureStringToString | Should -Be $secret
-            }
-            finally
-            {
-                Uninstall-CCertificate -Thumbprint $cert.Thumbprint -StoreLocation CurrentUser -StoreName My
-            }
+            $revealedSecret = Unprotect-CString -ProtectedString $rsaCipherText -Thumbprint $cert.Thumbprint
+            $Global:Error.Count | Should -Be 0
+            $revealedSecret | Convert-CSecureStringToString | Should -Be $secret
         }
 
-        It 'should convert to plain text' {
-            $originalText = [Guid]::NewGuid().ToString()
-            $protectedText = Protect-CString -String $originalText -ForUser
-            $plainText = Unprotect-CString -ProtectedString $protectedText -AsPlainText
-            $plainText | Should -BeOfType ([String])
-            $plainText | Should -Be $originalText
+        It 'should handle when cert is installed multiple times with private key' {
+            $cert = Install-CCertificate -Path $privateKeyPath -StoreLocation CurrentUser -StoreName My -PassThru
+            $null = Install-CCertificate -Path $privateKeyPath -StoreLocation CurrentUser -StoreName CertificateAuthority
+
+            $revealedSecret = Unprotect-CString -ProtectedString $rsaCipherText `
+                                                -Thumbprint $cert.Thumbprint `
+                                                -WarningVariable 'warnings' `
+                                                -WarningAction SilentlyContinue
+            $Global:Error.Count | Should -Be 0
+            $revealedSecret | Convert-CSecureStringToString | Should -Be $secret
+            $warnings | Should -Match '^Found 2 certificates'
+        }
+
+        It 'should handle when cert is installed multiple times, once without the private key' {
+            $cert = Install-CCertificate -Path $privateKeyPath -StoreLocation CurrentUser -StoreName My -PassThru
+            $null = Install-CCertificate -Path $publicKeyPath -StoreLocation CurrentUser -StoreName CertificateAuthority
+
+            $revealedSecret = Unprotect-CString -ProtectedString $rsaCipherText -Thumbprint $cert.Thumbprint -WarningVariable 'warnings'
+            $Global:Error.Count | Should -Be 0
+            $revealedSecret | Convert-CSecureStringToString | Should -Be $secret
+            $warnings | Should -BeNullOrEmpty
+        }
+
+        It 'should handle when cert is installed multiple times, all without the private key' {
+            $cert = Install-CCertificate -Path $publicKeyPath -StoreLocation CurrentUser -StoreName My -PassThru
+            $null = Install-CCertificate -Path $publicKeyPath -StoreLocation CurrentUser -StoreName CertificateAuthority
+
+            $revealedSecret = Unprotect-CString -ProtectedString $rsaCipherText -Thumbprint $cert.Thumbprint -ErrorAction SilentlyContinue
+            $Global:Error.Count | Should -BeGreaterThan 0
+            $Global:Error[0] | Should -Match '^Found 2 certificates at ".+" but none of them contain a private key or the private key is null'
+            $revealedSecret | Should -BeNullOrEmpty
         }
     }
 
@@ -164,22 +214,14 @@ Describe 'Unprotect-String.AES' {
     }
 }
 
-if( (Test-Path -Path 'cert:') )
-{
-    $certWithEmptyPrivateKey = 
-        Get-ChildItem -Path 'cert:\*\*\*' |
-        Where-Object 'HasPrivateKey' -eq $true |
-        Where-Object 'PrivateKey' -eq $null |
-        Select-Object -First 1
+Describe 'Unprotect-CString.when user does not have access to private key' {
+    It 'should fail' {
+        $cert = Get-CCertificate -Path $privateKeyPath
+        $cert | Add-member -MemberType NoteProperty -Name 'PrivateKey' -Value $null -Force
+        $cert | Add-Member -MemberType NoteProperty -Name 'HasPrivateKey' -Value $true -Force
 
-    if( $certWithEmptyPrivateKey )
-    {
-        Describe 'Unprotect-CString.when user does not have access to private key' {
-            It 'should fail' {
-                { Unprotect-CString -ProtectedString 'doesn''t matter' -Thumbprint $certWithEmptyPrivateKey.Thumbprint -ErrorAction Stop } |
-                    Should -Throw 'has a private key, but it is null'
-            }
-        }
+        { Unprotect-CString -ProtectedString 'doesn''t matter' -Certificate $cert -ErrorAction Stop } |
+            Should -Throw 'has a private key, but it is null'
     }
 }
 
@@ -188,7 +230,7 @@ Describe 'Unprotect-CString.when decryption fails' {
     {
         Context 'DPAPI' {
             It 'should fail' {
-                { 
+                {
                     $Global:Error.Clear()
                     Unprotect-CString -ProtectedString 'not encrypted' -ErrorAction SilentlyContinue |
                         Should -BeNullOrEmpty
@@ -200,7 +242,7 @@ Describe 'Unprotect-CString.when decryption fails' {
     }
     Context 'RSA' {
         It 'should fail' {
-            { 
+            {
                 $Global:Error.Clear()
                 Unprotect-CString -ProtectedString 'not encrypted' `
                                   -PrivateKeyPath $privateKeyPath `
@@ -214,7 +256,7 @@ Describe 'Unprotect-CString.when decryption fails' {
     }
     Context 'AES' {
         It 'should fail' {
-            { 
+            {
                 $Global:Error.Clear()
                 $key = 'passwordpasswordpasswordpassword'
                 $fakeCipherText =

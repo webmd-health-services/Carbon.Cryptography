@@ -180,7 +180,7 @@ function Unprotect-CString
 
         [byte[]]$keyBytes = [byte[]]::New(0)
 
-        # Find and validate the RSA certificate, if needed. We do it here so our try/catch around the actual 
+        # Find and validate the RSA certificate, if needed. We do it here so our try/catch around the actual
         # decryption doesn't handle these errors.
         if( $PSCmdlet.ParameterSetName -like 'RSA*' )
         {
@@ -201,10 +201,31 @@ function Unprotect-CString
                 $count = $certificates | Measure-Object | Select-Object -ExpandProperty 'Count'
                 if( $count -gt 1 )
                 {
-                    $msg = "Found $($count) certificates at ""$($PrivateKeyPath)"". Arbitrarily choosing the first " +
-                        'one. If you get errors, consider passing the exact path to the certificate you want to ' +
-                        'the "Unprotect-CString" function''s "PrivateKeyPath" parameter.'
-                    Write-Warning -Message $msg
+                    $certificates = $certificates | Where-Object { $_.HasPrivateKey -and $_.PrivateKey }
+                    $privateKeyCount = $certificates | Measure-Object | Select-Object -ExpandProperty 'Count'
+
+                    if( $privateKeyCount -gt 1 )
+                    {
+                        $msg = "Found $($privateKeyCount) certificates (which contain private keys) at ""$($PrivateKeyPath)"". " +
+                            'Arbitrarily choosing the first one. If you get errors, consider passing the exact path to ' +
+                            'the certificate you want to the "Unprotect-CString" function''s "PrivateKeyPath" parameter.'
+                        Write-Warning -Message $msg
+                    }
+                    elseif( $privateKeyCount -eq 0 )
+                    {
+
+                        $installedInCertStoreMsg = ''
+                        if ($PSCmdlet.ParameterSetName -eq 'RSAByThumbprint')
+                        {
+                            $installedInCertStoreMsg =
+                                'This is usually because the certificate was installed without a private key or the ' +
+                                'current user doesn''t have permission to read the private key.'
+                        }
+
+                        "Found $($count) certificates at ""$($PrivateKeyPath)"" but none of them contain a private " +
+                        "key or the private key is null.$(' ' + $installedInCertStoreMsg)" | Write-Error
+                        return
+                    }
                 }
                 $Certificate = $certificates | Select-Object -First 1
                 if( -not $Certificate )
