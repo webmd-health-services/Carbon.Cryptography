@@ -16,24 +16,26 @@ $rsaCipherText = Protect-CString -String $secret -PublicKeyPath $privateKeyPath
 
 function Reset
 {
-    # Uninstall-CCertificate doesn't work on Windows yet
-    if( (Test-COperatingSystem -IsWindows) )
+    # Uninstall-CCertificate only works on Windows
+    if( -not (Test-COperatingSystem -IsWindows) )
     {
-        # Uninstall the test certs from all locations and stores
-        $certsToUninstall = @($publicKeyPath, $publicKey2Path)
-        foreach ($cert in $certsToUninstall)
+        return
+    }
+
+    # Uninstall the test certs from all locations and stores
+    $certsToUninstall = @($publicKeyPath, $publicKey2Path)
+    foreach ($cert in $certsToUninstall)
+    {
+        $thumbprint = Get-CCertificate -Path $cert | Select-Object -ExpandProperty 'Thumbprint'
+        $storeLocations = [enum]::GetValues([System.Security.Cryptography.X509Certificates.StoreLocation])
+
+        foreach ($location in $storeLocations)
         {
-            $thumbprint = Get-CCertificate -Path $cert | Select-Object -ExpandProperty 'Thumbprint'
-            $storeLocations = [enum]::GetValues([System.Security.Cryptography.X509Certificates.StoreLocation])
+            $storeNames = [enum]::GetValues([System.Security.Cryptography.X509Certificates.StoreName])
 
-            foreach ($location in $storeLocations)
+            foreach ($name in $storeNames)
             {
-                $storeNames = [enum]::GetValues([System.Security.Cryptography.X509Certificates.StoreName])
-
-                foreach ($name in $storeNames)
-                {
-                    Uninstall-CCertificate -Thumbprint $thumbprint -StoreLocation $location -StoreName $name
-                }
+                Uninstall-CCertificate -Thumbprint $thumbprint -StoreLocation $location -StoreName $name
             }
         }
     }
