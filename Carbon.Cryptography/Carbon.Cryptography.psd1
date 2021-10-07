@@ -17,7 +17,7 @@
     RootModule = 'Carbon.Cryptography.psm1'
 
     # Version number of this module.
-    ModuleVersion = '1.0.3'
+    ModuleVersion = '1.1.0'
 
     # ID used to uniquely identify this module
     GUID = '225b9f63-3e3e-406c-87a0-33d34f30cd8e'
@@ -138,6 +138,8 @@
 extra files to the directories where private keys are saved.
 * Fixed: In some situations, the `Install-CCertificate` function, when passed a certificate object to install with a
 private key, would fail to install the private key.
+*#1.1.10: Adding a `Find-CtlsCertificate` function to look through the local machine's My store for a certificate matching a list
+of hostnames being passed in as a parameter.
 '@
         } # End of PSData hashtable
 
