@@ -117,7 +117,7 @@
 
             # Tags applied to this module. These help with module discovery in online galleries.
             Tags = @( 
-                'Desktop', 'Core', 'Caron', 'security', 'convert', 'securestring', 'string', 'certificate',
+                'Desktop', 'Core', 'Carbon', 'security', 'convert', 'securestring', 'string', 'certificate',
                 'certificates', 'x509', 'x509certificate', 'x509certificates', 'install', 'uninstall', 'encrypt',
                 'decrypt', 'aes', 'rsa', 'protect', 'unprotect', 'crypto', 'cryptography', 'dpapi', 'key', 'public-key',
                 'private-key', 'asymmetric', 'symmetric'
@@ -135,12 +135,7 @@
             Prerelease = ''
 
             # ReleaseNotes of this module
-            ReleaseNotes = @'
-# 1.1.10 
-
-* Adding a `Find-CtlsCertificate` function to look through the local machine's My store for a certificate matching a 
-hostname being passed in as a parameter.
-'@
+            ReleaseNotes = 'https://github.com/webmd-health-services/Carbon.Cryptography/blob/main/CHANGELOG.md'
         } # End of PSData hashtable
 
     } # End of PrivateData hashtable

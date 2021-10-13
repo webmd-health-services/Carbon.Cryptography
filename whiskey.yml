@@ -24,6 +24,8 @@ Build:
     Path:
     - LICENSE
     - NOTICE
+    - README.md
+    - CHANGELOG.md
     DestinationDirectory: Carbon.Cryptography
 
 - GetPowerShellModule:

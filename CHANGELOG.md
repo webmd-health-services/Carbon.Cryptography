@@ -1,0 +1,61 @@
+
+# 1.1.0
+* Added `Find-CtlsCertificate` function that finds an HTTPS certificate that matches a given hostname, searching the My
+  store for the local machine or current user.
+
+
+# 1.0.4
+
+* Fixed: `Unprotect-CString `sometimes fails to decrypt a secret if the decryption key certificate is installed in
+  multiple certificate stores but some of those times without the private key.
+
+
+# 1.0.3
+
+* Fixed: When installing certificates with private keys, the `Install-CCertificate` function causes Windows API to write
+  extra files to the directories where private keys are saved.
+* Fixed: In some situations, the `Install-CCertificate` function, when passed a certificate object to install with a
+  private key, would fail to install the private key.
+
+
+# 1.0.2
+
+* Fixed: `Unprotect-CString` error handling fails when encryption fails.
+
+
+# 1.0.1
+
+* Fixed: `Protect-CString` incorrectly marked as a filter instead of a function.
+* Fixed: `Protect-CString` and `Unprotect-CString` failed to handle encryption exceptions.
+
+# 1.0.0
+
+## Upgrade Instructions
+
+If upgrading from Carbon 2, you should do the following:
+
+* `Get-CCertificate` and `Install-CCertificate` no longer accept plaintext passwords. Ensure the value passed to the 
+  `Password` parameter of the `Get-CCertificate` and `Install-CCertificate` functions is a `[securestring]`.
+* `Install-CCertificate` no longer installs a certificate if it is already installed. Add a `-Force` switch to all
+  usages of `Install-CCertificate` where you need existing certificates to be replaced.
+* `Install-CCertificate` no longer returns the installed certificate. Add a `-PassThru` switch to all usages of
+  `Install-CCertificate` where your code expects a return value.
+* `Unprotect-CString` now returns decrypted text as a `[securestring]`. Add the `-AsPlainText` to use the old behavior
+  and get back a plain text string. Remove the `-AsSecureString` parameter if you were previously requesting a secure
+  string.
+
+## Changes
+
+* Migrated `Convert-CSecureStringToString` from Carbon.
+* `Convert-CSecureStringToString` now accepts piping in secure strings.
+* Migrated `Get-CCertificate`, `Install-CCertificate`, and `Uninstall-CCertificate` from Carbon.
+* Changed the `Password` parameter on the `Get-CCertificate` and `Install-CCertificate` functions to be a
+  `[securestring]`. Plain text passwords are no longer allowed.
+* `Install-CCertificate` no longer installs a certificate if it is already installed. Use the new `-Force` switch to
+  always re-install a certificate.
+* `Install-CCertificate` no longer always returns the installed certificate. If you want the certificate returned, use
+  the new `-PassThru` switch.
+* The `Get-CCertificate` function's default parameter set is now loading a certificate by path and you no longer have
+  to explicitly provide the `-Path` parameter.
+* The `Unprotect-CString` function now returns the decrypted text as a `[securestring]` by default instead of a
+  `[String]`. Use the `-AsPlainText` switch to get a plain text string back (not recommended).
