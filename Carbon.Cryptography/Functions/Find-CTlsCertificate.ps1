@@ -12,34 +12,34 @@ function Find-CTlsCertificate
     match will be returned.
 
     .OUTPUTS
-    Certificate that was found or `$null` if no match was found.
+    System.Security.Cryptography.x509Certificates.X509Certificate2 that was found or `$null` if no match was found.
 
     .EXAMPLE
     Find-CTlsCertificate ("2.5.29.17", "2.6.19.34")
 
-    Gets the first certificate object with a Subject Alternative Name matching any of the hostnames in our list.
+    Gets the first X509Certificate2 object with a Subject Alternative Name matching any of the hostnames in our list.
     #>
 
     [CmdletBinding()]
     [OutputType([Security.Cryptography.X509Certificates.X509Certificate2])]
     param(
-        [Parameter(Mandatory)]
         # The hostname to be matched with a certificate's subject alternate name.
-        [String[]]$HostNames
+        [Parameter(Mandatory)]
+        [String[]] $HostName
     )
 
     Set-StrictMode -Version 'Latest'
+    Use-CallerPreference -Cmdlet $PSCmdlet -Session $ExecutionContext.SessionState
+    
     $ipProperties = [Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties()
     $serverFqdn = "$($ipProperties.HostName).$($ipProperties.DomainName)"
     $foundCert = $false
     $installedCertificates = [Collections.ArrayList]::new()
 
-    $installedCertificates = Get-LocalCertificates `
-                           | Where-Object -Property NotAfter -gt (Get-Date -Format 'MM/dd/yyyy HH:mm:ss') `
-                           | Where-Object -Property NotBefore -le (Get-Date -Format 'MM/dd/yyyy HH:mm:ss')
+    $installedCertificates = Get-LocalCertificate | Sort-Object -Property 'NotAfter' -Descending
 
-    <# Loop through certificates on local machine My store after ordering by NotAfter date descending to get
-    certificate with longest valid date #>
+    # Loop through certificates on local machine My store after ordering by NotAfter date descending to get
+    # certificate with longest valid date
     foreach( $certificate in $installedCertificates )
     {
         Write-Verbose -Message ("$($certificate.Thumbprint)  $($certificate.SubjectName.Name)")
@@ -50,6 +50,26 @@ function Find-CTlsCertificate
         else
         {
             Write-Verbose -Message ("  ! private key")
+            continue
+        }
+
+        if( $certificate.NotBefore -lt  (Get-Date) )
+        {
+            Write-Verbose -Message "   not before"
+        }
+        else
+        {
+            Write-Verbose -Message "  ! not before  $($certificate.NotBefore.ToString('yyyy-MM-dd HH:mm:ss'))"
+            continue
+        }
+
+        if( (Get-Date) -lt $certificate.NotAfter )
+        {
+            Write-Verbose -Message "   not after"
+        }
+        else
+        {
+            Write-Verbose -Message "  ! not after  $($certificate.NotAfter.ToString('yyyy-MM-dd HH:mm:ss'))"
             continue
         }
 
@@ -87,17 +107,15 @@ function Find-CTlsCertificate
         # Checking certificate's extensions for Subject Alternative Name matching hostnames
         foreach($extension in $certificate.Extensions)
         {
-            if($extension.Oid.FriendlyName -eq "Subject Alternative Name")
+            if($extension.Oid.FriendlyName -ne "Subject Alternative Name")
             {
-                foreach($hostName in $HostNames)
-                {
-                    if($Extension.Oid.Value -eq $hostName)
-                    {
-                        Write-Verbose -Message ("    Tls certificate matching hostname found.")
-                        $foundCert = $true
-                        return $certificate
-                    }
-                }
+                continue
+            }
+
+            if( ($HostName | Where-Object { $_ -eq $Extension.Oid.Value }) )
+            {
+                Write-Verbose -Message ("  Certificate found $($Extension.Oid.Value)")
+                return $certificate
             }
         }
     }
@@ -105,6 +123,5 @@ function Find-CTlsCertificate
     if( -not $foundCert )
     {
         Write-Error -Message ("Unable to find a trusted machine TLS certificate. See verbose output for more information.")
-        return $null;
     }
 }

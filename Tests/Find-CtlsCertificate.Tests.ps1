@@ -8,7 +8,8 @@ $machineName = [Environment]::MachineName
 $foundCert = $null
 $mockedCertificates = [Collections.ArrayList]::new()
 
-function Init {
+function Init 
+{
     $script:foundCert = $null
     $script:mockedCertificates = [Collections.ArrayList]::new()
 }
@@ -17,15 +18,23 @@ function GivenCertificate
 {
     param(
         [Parameter(Mandatory)]
-        [String]$For,
+        [String] $For,
+
         [Parameter(Mandatory)]
-        [String]$WithThumbprint,
-        [switch]$NoPrivateKey,
-        [String[]]$WithDnsNames = @(),
-        [String[]]$WithUsages,
-        [switch]$ThatFailsVerify,
-        [String]$ExtensionFriendlyName,
+        [String] $WithThumbprint,
+
+        [switch] $WithNoPrivateKey,
+
+        [String[]] $WithDnsNames = @(),
+
+        [String[]] $WithUsages,
+
+        [switch] $ThatFailsVerify,
+
+        [String] $ExtensionFriendlyName,
+
         [datetime] $NotBefore,
+
         [datetime] $NotAfter
     )
 
@@ -38,18 +47,18 @@ function GivenCertificate
     }
     $extensions = [PSCustomObject]@{
         'Oid' = [PSCustomObject]@{
-            'Value' = $For
-            'FriendlyName' = 'Subject Alternative Name'
+            'Value' = $For;
+            'FriendlyName' = 'Subject Alternative Name';
         }
     }
     $certificate = [pscustomobject]@{
-        'Thumbprint' = $WithThumbprint
+        'Thumbprint' = $WithThumbprint;
         'SubjectName' = [pscustomobject]@{
-            'Name' = "CN=$($For)"
+            'Name' = "CN=$($For)";
         }
         'DnsNameList' = $fullDnsList
-        'EnhancedKeyUsageList' = $WithUsages | ForEach-Object { [pscustomobject]@{ 'FriendlyName' = $_ } }
-        'HasPrivateKey' = -not $NoPrivateKey
+        'EnhancedKeyUsageList' = $WithUsages | ForEach-Object { [pscustomobject]@{ 'FriendlyName' = $_; } }
+        'HasPrivateKey' = -not $WithNoPrivateKey
         'Extensions' = $extensions
         'NotBefore' = $NotBefore
         'NotAfter' = $NotAfter
@@ -60,38 +69,41 @@ function GivenCertificate
         $verify = { $false }
     }
     $certificate | Add-Member -MemberType ScriptMethod -Name 'Verify' -Value $verify
-    [void]$mockedCertificates.Add($certificate)
+    [void] $mockedCertificates.Add($certificate)
 }
 
 function WhenFindingTlsCertificate
 {
+    [CmdletBinding()]
     param(
-        [String]$Name
+        [String] $Name
     )
 
     $installedCertificates = $script:mockedCertificates
 
-    Mock -CommandName 'Get-LocalCertificates' `
+    Mock -CommandName 'Get-LocalCertificate' `
          -ModuleName 'Carbon.Cryptography' `
          -MockWith { $installedCertificates }.GetNewClosure()
     
-    $script:foundCert = Find-CTlsCertificate -HostName $Name -ErrorAction SilentlyContinue
+    $script:foundCert = Find-CTlsCertificate -HostName $Name
 }
 
-function ThenFoundCertificate {
+function ThenFoundCertificate 
+{
     param(
-        [String]$HostName
+        [String] $HostName
     )
 
     $foundCert | Should -Not -BeNullOrEmpty
     $foundCert.DnsNameList | Should -Contain $HostName
 }
 
-function ThenNoCertificateFound{
+function ThenNoCertificateFound
+{
     $foundCert | Should -BeNullOrEmpty
 }
 
-Describe 'Find-CTlsCertificate' {
+Describe 'Find-CTlsCertificate.when a matching certificate exists' {
     It 'should find a certificate' {
         Init
         GivenCertificate -For $machineName `
@@ -106,8 +118,8 @@ Describe 'Find-CTlsCertificate' {
     }
 }
 
-Describe 'Find-CTlsCertificate' {
-    It 'should not find a certificate (due to no certificates matching hostname)' {
+Describe 'Find-CTlsCertificate.when no certificates match hostname' {
+    It 'should not find a certificate' {
         Init
         GivenCertificate -For $machineName `
                          -WithThumbprint 'No certificate matching hostname' `
@@ -116,29 +128,29 @@ Describe 'Find-CTlsCertificate' {
                          -NotBefore (Get-Date) `
                          -NotAfter (Get-Date).AddYears(1)
         Start-Sleep -Seconds 1
-        WhenFindingTlsCertificate 'NotFound'
+        WhenFindingTlsCertificate 'NotFound' -ErrorAction SilentlyContinue
         ThenNoCertificateFound 
     }
 }
 
-Describe 'Find-CTlsCertificate' {
-    It 'should not find a certificate (due to no private key)' {
+Describe 'Find-CTlsCertificate.when no private key exists' {
+    It 'should not find a certificate' {
         Init
         GivenCertificate -For $machineName `
                          -WithThumbprint 'No private key' `
-                         -NoPrivateKey $true `
+                         -WithNoPrivateKey `
                          -WithDnsNames ($serverFqdn) `
                          -WithUsages ('Server Authentication') `
                          -NotBefore (Get-Date) `
                          -NotAfter (Get-Date).AddYears(1)
         Start-Sleep -Seconds 1
-        WhenFindingTlsCertificate $machineName
+        WhenFindingTlsCertificate $machineName -ErrorAction SilentlyContinue
         ThenNoCertificateFound 
     }
 }
 
-Describe 'Find-CTlsCertificate' {
-    It 'should not find a certificate (due to no matching dns name)' {
+Describe 'Find-CTlsCertificate.when no dns names match' {
+    It 'should not find a certificate' {
         Init
         GivenCertificate -For $machineName `
                          -WithThumbprint 'No matching dns name' `
@@ -147,13 +159,13 @@ Describe 'Find-CTlsCertificate' {
                          -NotBefore (Get-Date) `
                          -NotAfter (Get-Date).AddYears(1)
         Start-Sleep -Seconds 1
-        WhenFindingTlsCertificate $machineName
+        WhenFindingTlsCertificate $machineName -ErrorAction SilentlyContinue
         ThenNoCertificateFound 
     }
 }
 
-Describe 'Find-CTlsCertificate' {
-    It 'should not find a certificate (due to unsupported usages)' {
+Describe 'Find-CTlsCertificate.when there are unsupported usages' {
+    It 'should not find a certificate' {
         Init
         GivenCertificate -For $machineName `
                          -WithThumbprint 'Unsupported usages' `
@@ -162,13 +174,13 @@ Describe 'Find-CTlsCertificate' {
                          -NotBefore (Get-Date) `
                          -NotAfter (Get-Date).AddYears(1)
         Start-Sleep -Seconds 1
-        WhenFindingTlsCertificate $machineName
+        WhenFindingTlsCertificate $machineName -ErrorAction SilentlyContinue
         ThenNoCertificateFound 
     }
 }
 
-Describe 'Find-CTlsCertificate' {
-    It 'should not find a certificate (due to failing validation)' {
+Describe 'Find-CTlsCertificate.when certificate fails validation' {
+    It 'should not find a certificate' {
         Init
         GivenCertificate -For $machineName `
                          -WithThumbprint 'Fails validation' `
@@ -178,13 +190,13 @@ Describe 'Find-CTlsCertificate' {
                          -NotBefore (Get-Date) `
                          -NotAfter (Get-Date).AddYears(1)
         Start-Sleep -Seconds 1
-        WhenFindingTlsCertificate $machineName
+        WhenFindingTlsCertificate $machineName -ErrorAction SilentlyContinue
         ThenNoCertificateFound 
     }
 }
 
-Describe 'Find-CTlsCertificate' {
-    It 'should not find a certificate (due to expired certificate)' {
+Describe 'Find-CTlsCertificate.when certificate is expired' {
+    It 'should not find a certificate' {
         Init
         GivenCertificate -For $machineName `
                          -WithThumbprint 'Expired certificate' `
@@ -193,7 +205,7 @@ Describe 'Find-CTlsCertificate' {
                          -NotBefore (Get-Date).AddDays(-2) `
                          -NotAfter (Get-Date).AddDays(-1)
         Start-Sleep -Seconds 1
-        WhenFindingTlsCertificate $machineName
+        WhenFindingTlsCertificate $machineName -ErrorAction SilentlyContinue
         ThenNoCertificateFound 
     }
 }
