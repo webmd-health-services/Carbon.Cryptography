@@ -11,8 +11,13 @@ function Get-LocalCertificates{
 
     .OUTPUTS
     List of certificates on the local machine or `$null` if none are currently installed.
-    #>
 
+    .EXAMPLE
+    Get-LocalCertificates
+
+    Gets the list of certificates on the local machine.
+    #>
+    
     $location = 'LocalMachine'
     if(Test-COperatingSystem -IsLinux){
         $location = 'CurrentUser'

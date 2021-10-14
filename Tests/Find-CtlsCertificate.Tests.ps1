@@ -75,7 +75,7 @@ function WhenFindingTlsCertificate
          -ModuleName 'Carbon.Cryptography' `
          -MockWith { $installedCertificates }.GetNewClosure()
     
-    $script:foundCert = Find-CTlsCertificate -HostName $Name
+    $script:foundCert = Find-CTlsCertificate -HostName $Name -ErrorAction SilentlyContinue
 }
 
 function ThenFoundCertificate {
@@ -107,7 +107,7 @@ Describe 'Find-CTlsCertificate' {
 }
 
 Describe 'Find-CTlsCertificate' {
-    It 'should not find a certificate' {
+    It 'should not find a certificate (due to no certificates matching hostname)' {
         Init
         GivenCertificate -For $machineName `
                          -WithThumbprint 'No certificate matching hostname' `
