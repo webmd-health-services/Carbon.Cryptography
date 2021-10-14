@@ -131,6 +131,7 @@ function Install-CCertificate
     {
         $keyFlags = [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::UserKeySet
     }
+
     $keyFlags = $keyFlags -bor [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet
 
     if( $Exportable )

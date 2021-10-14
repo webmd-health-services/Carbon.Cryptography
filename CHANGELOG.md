@@ -1,7 +1,14 @@
 
 # 1.1.0
+
 * Added `Find-CtlsCertificate` function that finds an HTTPS certificate that matches a given hostname, searching the My
   store for the local machine or current user.
+* Fixed: On Linux and macOS, `Get-CCertificate` doesn't return certificates from X509 certificate stores.
+* When getting a certificate out of the certificate stores, `Get-CCertificate` no longer requires a location, store
+  name, and thumbprint. When called with no parameters, `Get-CCertificate` returns *all* certificates in all certificate
+  stores (except stores with custom names). The `StoreLocation`, `StoreName`, `Thumbprint`, and `FriendlyName`
+  parameters now act as filters for what certificates to return. A certificate must match *all* filters to be returned.
+* Added a `Subject` parameter to `Get-CCertificate` to find certificates by subject.
 
 
 # 1.0.4
