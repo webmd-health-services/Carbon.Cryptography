@@ -82,7 +82,8 @@
         'Protect-CString',
         'Uninstall-CCertificate',
         'Unprotect-CString',
-        'Find-CTlsCertificate'
+        'Find-CTlsCertificate',
+        'Get-LocalCertificates'
     )
 
     # Cmdlets to export from this module. By default, you get a script module, so there are no cmdlets.

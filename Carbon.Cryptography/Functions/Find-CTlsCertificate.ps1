@@ -21,20 +21,26 @@ function Find-CTlsCertificate
     #>
 
     [CmdletBinding()]
+    [OutputType([Security.Cryptography.X509Certificates.X509Certificate2])]
     param(
         [Parameter(Mandatory)]
-        # The hostname to be matched with a certificate's subject alternate name
-        [String[]]$hostNames
+        # The hostname to be matched with a certificate's subject alternate name.
+        [String[]]$HostNames
     )
-    
+
     Set-StrictMode -Version 'Latest'
     $ipProperties = [Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties()
     $serverFqdn = "$($ipProperties.HostName).$($ipProperties.DomainName)"
     $foundCert = $false
+    $installedCertificates = [Collections.ArrayList]::new()
+
+    $installedCertificates = Get-LocalCertificates `
+                           | Where-Object -Property NotAfter -gt (Get-Date -Format 'MM/dd/yyyy HH:mm:ss') `
+                           | Where-Object -Property NotBefore -le (Get-Date -Format 'MM/dd/yyyy HH:mm:ss')
 
     <# Loop through certificates on local machine My store after ordering by NotAfter date descending to get
     certificate with longest valid date #>
-    foreach( $certificate in (Get-ChildItem -Path "Cert:\LocalMachine\My" | Sort-Object -Property NotAfter -Descending) )
+    foreach( $certificate in $installedCertificates )
     {
         Write-Verbose -Message ("$($certificate.Thumbprint)  $($certificate.SubjectName.Name)")
         if( $certificate.HasPrivateKey )
@@ -66,23 +72,6 @@ function Find-CTlsCertificate
             Write-Verbose -Message ("  ! Server Authentication  ($($certificate.EnhancedKeyUsageList -join ','))")
             continue
         }
-        
-        # Checking certificate's extensions for Subject Alternative Name matching hostnames
-        foreach($extension in $certificate.Extensions)
-        {
-            if($extension.Oid.FriendlyName -eq "Subject Alternative Name")
-            {
-                foreach($hostName in $hostNames)
-                {
-                    if($Extension.Oid.Value -eq $hostName)
-                    {
-                        Write-Verbose -Message ("    Tls certificate matching hostname found.")
-                        $foundCert = $true
-                        return $certificate
-                    }
-                }
-            }
-        }
 
         # Do this last as it can be slow.
         if( $certificate.Verify() )
@@ -93,6 +82,23 @@ function Find-CTlsCertificate
         {
             Write-Verbose -Message ("  ! verified")
             continue
+        }
+        
+        # Checking certificate's extensions for Subject Alternative Name matching hostnames
+        foreach($extension in $certificate.Extensions)
+        {
+            if($extension.Oid.FriendlyName -eq "Subject Alternative Name")
+            {
+                foreach($hostName in $HostNames)
+                {
+                    if($Extension.Oid.Value -eq $hostName)
+                    {
+                        Write-Verbose -Message ("    Tls certificate matching hostname found.")
+                        $foundCert = $true
+                        return $certificate
+                    }
+                }
+            }
         }
     }
 
