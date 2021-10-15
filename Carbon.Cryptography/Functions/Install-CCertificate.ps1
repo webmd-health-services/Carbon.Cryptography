@@ -116,8 +116,12 @@ function Install-CCertificate
         $keyStorageFlags = @{}
         if( $StoreLocation -eq [Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser )
         {
-            $keyStorageFlags['KeyStorageFlags'] = 
-                [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
+            # macOS doesn't support ephemeral key sets.
+            if( -not (Test-COperatingSystem -MacOS) )
+            {
+                $keyStorageFlags['KeyStorageFlags'] =
+                    [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
+            }
         }
         $Certificate = Get-CCertificate -Path $Path -Password $Password @keyStorageFlags
     }
