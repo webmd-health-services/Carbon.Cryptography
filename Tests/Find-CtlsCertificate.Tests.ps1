@@ -8,12 +8,6 @@ $machineName = [Environment]::MachineName
 $foundCert = $null
 $mockedCertificates = [Collections.ArrayList]::new()
 
-function Init 
-{
-    $script:foundCert = $null
-    $script:mockedCertificates = [Collections.ArrayList]::new()
-}
-
 function GivenCertificate
 {
     param(
@@ -49,19 +43,19 @@ function GivenCertificate
         'Oid' = [PSCustomObject]@{
             'Value' = $For;
             'FriendlyName' = 'Subject Alternative Name';
-        }
+        };
     }
     $certificate = [pscustomobject]@{
         'Thumbprint' = $WithThumbprint;
         'SubjectName' = [pscustomobject]@{
             'Name' = "CN=$($For)";
-        }
-        'DnsNameList' = $fullDnsList
-        'EnhancedKeyUsageList' = $WithUsages | ForEach-Object { [pscustomobject]@{ 'FriendlyName' = $_; } }
-        'HasPrivateKey' = -not $WithNoPrivateKey
-        'Extensions' = $extensions
-        'NotBefore' = $NotBefore
-        'NotAfter' = $NotAfter
+        };
+        'DnsNameList' = $fullDnsList;
+        'EnhancedKeyUsageList' = $WithUsages | ForEach-Object { [pscustomobject]@{ 'FriendlyName' = $_; }; }
+        'HasPrivateKey' = -not $WithNoPrivateKey;
+        'Extensions' = $extensions;
+        'NotBefore' = $NotBefore;
+        'NotAfter' = $NotAfter;
     }
     $verify = { $true }
     if( $ThatFailsVerify )
@@ -70,6 +64,27 @@ function GivenCertificate
     }
     $certificate | Add-Member -MemberType ScriptMethod -Name 'Verify' -Value $verify
     [void] $mockedCertificates.Add($certificate)
+}
+
+function Init 
+{
+    $script:foundCert = $null
+    $script:mockedCertificates = [Collections.ArrayList]::new()
+}
+
+function ThenFoundCertificate 
+{
+    param(
+        [String] $HostName
+    )
+
+    $foundCert | Should -Not -BeNullOrEmpty
+    $foundCert.DnsNameList | Should -Contain $HostName
+}
+
+function ThenNoCertificateFound
+{
+    $foundCert | Should -BeNullOrEmpty
 }
 
 function WhenFindingTlsCertificate
@@ -86,21 +101,6 @@ function WhenFindingTlsCertificate
          -MockWith { $installedCertificates }.GetNewClosure()
     
     $script:foundCert = Find-CTlsCertificate -HostName $Name
-}
-
-function ThenFoundCertificate 
-{
-    param(
-        [String] $HostName
-    )
-
-    $foundCert | Should -Not -BeNullOrEmpty
-    $foundCert.DnsNameList | Should -Contain $HostName
-}
-
-function ThenNoCertificateFound
-{
-    $foundCert | Should -BeNullOrEmpty
 }
 
 Describe 'Find-CTlsCertificate.when a matching certificate exists' {

@@ -3,13 +3,14 @@ function Find-CTlsCertificate
 {
     <#
     .SYNOPSIS
-    Gets a certificate from the local machine's My store that matches a list of hostname being passed in as a parameter.
+    Gets a certificate from the My store from the current user or local machine's certificates that matches a list of 
+    hostnames being passed in as a parameter.
 
     .DESCRIPTION
-    The `Find-CTlsCertificate` function gets a certificate from the local machine's My store. A list of hostnames are passed in 
-    as a parameter. The certificates are ordered by NotAfter date descending so that the certificate with the longest valid date
-    will be returned if there is a match. The hostnames are checked against the certificate's Subject Alternate Names and the first 
-    match will be returned.
+    The `Find-CTlsCertificate` function gets a certificate from the My store from the current user or local machine's
+    certificates. A list of hostnames are passed in as a parameter. The certificates are ordered by NotAfter date 
+    descending so that the certificate with the longest valid date will be returned if there is a match. The hostnames
+    are checked against the certificate's Subject Alternate Names and the first match will be returned.
 
     .OUTPUTS
     System.Security.Cryptography.x509Certificates.X509Certificate2 that was found or `$null` if no match was found.
@@ -33,7 +34,6 @@ function Find-CTlsCertificate
     
     $ipProperties = [Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties()
     $serverFqdn = "$($ipProperties.HostName).$($ipProperties.DomainName)"
-    $foundCert = $false
     $installedCertificates = [Collections.ArrayList]::new()
 
     $installedCertificates = Get-LocalCertificate | Sort-Object -Property 'NotAfter' -Descending
@@ -114,14 +114,11 @@ function Find-CTlsCertificate
 
             if( ($HostName | Where-Object { $_ -eq $Extension.Oid.Value }) )
             {
-                Write-Verbose -Message ("  Certificate found $($Extension.Oid.Value)")
+                Write-Verbose -Message ('^--------------------------------------^')
                 return $certificate
             }
         }
     }
 
-    if( -not $foundCert )
-    {
-        Write-Error -Message ("Unable to find a trusted machine TLS certificate. See verbose output for more information.")
-    }
+    Write-Error -Message ("Unable to find a trusted machine TLS certificate. See verbose output for more information.")
 }

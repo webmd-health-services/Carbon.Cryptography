@@ -77,13 +77,13 @@
     FunctionsToExport = @(
         'Convert-CSecureStringToByte',
         'Convert-CSecureStringToString',
+        'Find-CTlsCertificate',
         'Get-CCertificate',
+        'Get-LocalCertificate',
         'Install-CCertificate',
         'Protect-CString',
         'Uninstall-CCertificate',
-        'Unprotect-CString',
-        'Find-CTlsCertificate',
-        'Get-LocalCertificate'
+        'Unprotect-CString'
     )
 
     # Cmdlets to export from this module. By default, you get a script module, so there are no cmdlets.

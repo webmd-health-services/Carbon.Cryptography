@@ -2,20 +2,20 @@
 function Get-LocalCertificate{
     <#
     .SYNOPSIS
-    Gets a list of certificates from the local machine's My store based on the OS.
+    Gets a list of certificates from the My store from the current user or local machine's certificates based on the OS
 
     .DESCRIPTION
-    The `Get-LocalCertificate` function gets a list of certificates from the local machine's My store. The list will be sorted by 
-    NotAfter date descending to put the longest valid certificates first. The store location will be LocalMachine for Windows and 
-    MacOS while on Linux it will be CurrentUser.
+    The `Get-LocalCertificate` function gets a list of certificates from the My store from the current user or local 
+    machine's certificates. The list will be sorted by NotAfter date descending to put the longest valid certificates
+    first. The store location will be LocalMachine for Windows and MacOS while on Linux it will be CurrentUser.
 
     .OUTPUTS
-    List of certificates on the local machine or `$null` if none are currently installed.
+    List of certificates from the My store or `$null` if none are currently installed.
 
     .EXAMPLE
     Get-LocalCertificate
 
-    Gets the list of certificates on the local machine.
+    Gets the list of certificates from the My store.
     #>
 
     $location = 'LocalMachine'
