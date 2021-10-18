@@ -138,8 +138,8 @@
             ReleaseNotes = @'
 # 1.1.10 
 
-* Adding a `Find-CtlsCertificate` function to look through the local machine's My store for a certificate matching a list
-of hostnames being passed in as a parameter.
+* Adding a `Find-CtlsCertificate` function to look through the local machine's My store for a certificate matching a 
+hostname being passed in as a parameter.
 '@
         } # End of PSData hashtable
 

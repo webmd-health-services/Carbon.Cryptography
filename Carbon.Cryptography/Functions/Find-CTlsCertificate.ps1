@@ -3,37 +3,47 @@ function Find-CTlsCertificate
 {
     <#
     .SYNOPSIS
-    Gets a certificate from the My store from the current user or local machine's certificates that matches a list of 
-    hostnames being passed in as a parameter.
+    Gets a certificate from the My store from the current user or local machine's certificates that matches a hostname
+    being passed in as a parameter.
 
     .DESCRIPTION
-    The `Find-CTlsCertificate` function gets a certificate from the My store from the current user or local machine's
-    certificates. A list of hostnames are passed in as a parameter. The certificates are ordered by NotAfter date 
-    descending so that the certificate with the longest valid date will be returned if there is a match. The hostnames
-    are checked against the certificate's Subject Alternate Names and the first match will be returned.
+    The `Find-CTlsCertificate` function returns the first certificate that:
+
+    * has a private key.
+    * hasn't expired and whose start date is in the past
+    * contains the server's fully-qualified domain name in its DNS name list (the fully-qualified domain name is the
+    hostname and domain name from `[Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties()`).
+    * has 'Server Authentication' in its enhanced key usage list.
+    * is trusted by the local computer (i.e. its 
+    `System.Security.Cryptography.X509Certificates.X509Certificate2.Verify()` method returns `true`.
+    * the certificate's subject alternate name contains the hostname passed in.
 
     .OUTPUTS
     System.Security.Cryptography.x509Certificates.X509Certificate2 that was found or `$null` if no match was found.
 
     .EXAMPLE
-    Find-CTlsCertificate ("2.5.29.17", "2.6.19.34")
+    Find-CTlsCertificate -Hostaname ("example.com")
 
-    Gets the first X509Certificate2 object with a Subject Alternative Name matching any of the hostnames in our list.
+    Gets the first X509Certificate2 object with a Subject Alternative Name matching the hostname.
     #>
 
     [CmdletBinding()]
     [OutputType([Security.Cryptography.X509Certificates.X509Certificate2])]
     param(
         # The hostname to be matched with a certificate's subject alternate name.
-        [Parameter(Mandatory)]
-        [String[]] $HostName
+        [Parameter]
+        [String] $HostName
     )
 
     Set-StrictMode -Version 'Latest'
     Use-CallerPreference -Cmdlet $PSCmdlet -Session $ExecutionContext.SessionState
     
-    $ipProperties = [Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties()
-    $serverFqdn = "$($ipProperties.HostName).$($ipProperties.DomainName)"
+    if( -not $HostName )
+    {
+        $ipProperties = [Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties()
+        $HostName= "$($ipProperties.HostName).$($ipProperties.DomainName)"
+    }
+
     $installedCertificates = [Collections.ArrayList]::new()
 
     $installedCertificates = Get-LocalCertificate | Sort-Object -Property 'NotAfter' -Descending
@@ -73,13 +83,13 @@ function Find-CTlsCertificate
             continue
         }
 
-        if( $certificate.DnsNameList -contains $serverFqdn )
+        if( $certificate.DnsNameList -contains $HostName )
         {
-            Write-Verbose -Message ("    $($serverFqdn)")
+            Write-Verbose -Message ("    $($HostName)")
         }
         else
         {
-            Write-Verbose -Message ("  ! $($serverFqdn) ($($certificate.DnsNameList -join ', '))")
+            Write-Verbose -Message ("  ! $($HostName) ($($certificate.DnsNameList -join ', '))")
             continue
         }
 
@@ -104,21 +114,21 @@ function Find-CTlsCertificate
             continue
         }
         
-        # Checking certificate's extensions for Subject Alternative Name matching hostnames
-        foreach($extension in $certificate.Extensions)
-        {
-            if($extension.Oid.FriendlyName -ne "Subject Alternative Name")
-            {
-                continue
-            }
-
-            if( ($HostName | Where-Object { $_ -eq $Extension.Oid.Value }) )
-            {
-                Write-Verbose -Message ('^--------------------------------------^')
-                return $certificate
-            }
-        }
+        Write-Verbose -Message ('^--------------------------------------^')
+        return $certificate
     }
 
-    Write-Error -Message ("Unable to find a trusted machine TLS certificate. See verbose output for more information.")
+    $msg = "HTTPS certificate for $($HostName) does not exist. Make sure there is a certificate in the the LocalMachine " +
+       'or CurrentUser My certificate stores that:' + [Environment]::NewLine +
+       ' ' + [Environment]::NewLine +
+       '* has a private key' + [Environment]::NewLine +
+       '* hasn''t expired and whose "NotBefore"/"Valid From" date is in the past' + [Environment]::NewLine +
+       "* has subject ""CN=$($HostName)""; or whose Server Alternative Names contains ""$($HostName)""" +
+       [Environment]::NewLine +
+       '* has an enhanced key usage of "Server Authentication"' +
+       '* is trusted.' + [Environment]::NewLine +
+       ' ' + [Environment]::NewLine + 
+       'Use the -Verbose switch to see why each certificate was rejected.'
+
+    Write-Error -Message $msg
 }
