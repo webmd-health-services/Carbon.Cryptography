@@ -159,7 +159,7 @@ Describe 'Find-CTlsCertificate.when no dns names match' {
                          -NotBefore (Get-Date) `
                          -NotAfter (Get-Date).AddYears(1)
         Start-Sleep -Seconds 1
-        WhenFindingTlsCertificate $machineName -ErrorAction SilentlyContinue
+        WhenFindingTlsCertificate 'MyMachineName' -ErrorAction SilentlyContinue
         ThenNoCertificateFound 
     }
 }

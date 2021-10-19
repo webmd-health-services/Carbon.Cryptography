@@ -31,7 +31,6 @@ function Find-CTlsCertificate
     [OutputType([Security.Cryptography.X509Certificates.X509Certificate2])]
     param(
         # The hostname to be matched with a certificate's subject alternate name.
-        [Parameter]
         [String] $HostName
     )
 
