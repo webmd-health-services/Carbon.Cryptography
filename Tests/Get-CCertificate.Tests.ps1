@@ -114,13 +114,6 @@ if( $onWindows )
     }
 }
 
-# Friendly name is a Windows-only construct.
-$notMsg = ''
-if( -not $onWindows )
-{
-    $notMsg = 'not '
-}
-
 function Search
 {
     param(
@@ -325,12 +318,6 @@ Describe 'Get-CCertificate.when certificate does not exist' {
         $Global:Error.Count | Should -Be 0
         $cert | Should -BeNullOrEmpty
     }
-}
-
-$customStoreItMsg = 'find certificate'
-if( (Test-COperatingSystem -MacOS) )
-{
-    $customStoreItMsg = 'fail'
 }
 
 if( (Test-Path -Path 'Cert:\CurrentUser\CA') )

@@ -3,35 +3,89 @@ function Find-CTlsCertificate
 {
     <#
     .SYNOPSIS
-    Gets a certificate from the My store from the current user or local machine's certificates that matches a hostname
-    being passed in as a parameter.
+    Finds a TLS certificate that matches a hostname from the certificate stores.
 
     .DESCRIPTION
+    The `Find-CTlsCertficate` function finds a TLS certificate for the current computer. It determines the computer's
+    domain name/hostname using the `HostName` and `DomainName` properties from 
+    `[System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties()`. To get a certificate for a custom
+    hostname, pass that hostname to the `HostName` parameter.
+
     The `Find-CTlsCertificate` function returns the first certificate that:
 
     * has a private key.
     * hasn't expired and whose start date is in the past
-    * contains the server's fully-qualified domain name in its DNS name list (the fully-qualified domain name is the
-    hostname and domain name from `[Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties()`).
-    * has 'Server Authentication' in its enhanced key usage list.
-    * is trusted by the local computer (i.e. its 
-    `System.Security.Cryptography.X509Certificates.X509Certificate2.Verify()` method returns `true`.
-    * the certificate's subject alternate name contains the hostname passed in.
+    * contains the `HostName` in its subject or Subject Alternative Name list.
+    * has 'Server Authentication' in its enhanced key usage list or has no enhanced key usage metadata.
+
+    Additionally, you can use the `-Trusted` switch to only return trusted certificates, i.e. certificates whose
+    issuing certificate authorities in its cert chain are installed in the local machine or current user's [trusted
+    certificate stores](https://docs.microsoft.com/en-us/dotnet/standard/security/cross-platform-cryptography#x509store).
+    `Find-CTlsCertificate` calls the `Verify()` method on each `X509Certificate2` object to determine if that
+    certificate is trusted.
+
+    If multiple certificates are found, `Find-CTlsCertificate` will return the certificate that expires later. If no
+    certificate is found, it writes an error and returns nothing.
+
+    Use the `-Verbose` switch to see why a certificate is or isn't being found and selected by `Find-CTlsCertificate`.
+    You'll see messages for each selection criteria and if a criterium isn't met, you'll see a `!` flag. For example,
+    this verbose output from `Find-CTlsCertificate -HostName 'example.com' -Trusted -Verbose`
+
+        VERBOSE: FCD157FCB753E2B388183C19021301B1739DF1E2
+        VERBOSE: CN=sub.example.com
+        VERBOSE:     private key      True
+        VERBOSE:     start date       2021-10-18 15:43:23
+        VERBOSE:     expiration date  2023-10-19 15:43:23
+        VERBOSE:   ! hostname         ['sub.example.com']
+        VERBOSE: 
+        VERBOSE: 7F660D4F7201B8EB8F7F6AC2A0906253C240584F
+        VERBOSE: CN=example.com
+        VERBOSE:     private key      True
+        VERBOSE:     start date       2021-10-18 15:43:23
+        VERBOSE:     expiration date  2022-10-19 15:43:23
+        VERBOSE:     hostname         ['example.com']
+        VERBOSE:     key usage        Any
+        VERBOSE:     trusted          True
+        VERBOSE: ^--------------------------------------^
+
+    shows that certificate `FCD157FCB753E2B388183C19021301B1739DF1E2` wasn't selected because its hostname didn't match
+    the `example.com` hostname, but that certificate `7F660D4F7201B8EB8F7F6AC2A0906253C240584F` was selected because
+    it matched all six criteria.
 
     .OUTPUTS
     System.Security.Cryptography.x509Certificates.X509Certificate2 that was found or `$null` if no match was found.
 
     .EXAMPLE
-    Find-CTlsCertificate -Hostaname ("example.com")
+    Find-CTlsCertificate
 
-    Gets the first X509Certificate2 object with a Subject Alternative Name matching the hostname.
+    Demonstrates how to find a TLS certificate for the current computer using the computer's hostname and domain name
+    as determined by the `[System.Net.NetworkInformation.IPGlobalProperties]` object returned by the 
+    ``[System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties()::GetIPGlobalProperties()` method.
+
+    .EXAMPLE
+    Find-CTlsCertificate -HostName 'example.com'
+
+    Demonstrates how to find a valid TLS valid certificate for a hostname, in this example, `example.com`.
+
+    .EXAMPLE
+    Find-CTlsCertificate -HostName 'example.com' -Trusted
+
+    Demonstrates how to find a valid *trusted* TLS certificate by using the `-Trusted` switch. Trusted certificates
+    are issued by certificate authorities whose certificates (and all certificates in the certificate chain) are in the
+    local machine or current user's [trusted certificate stores](https://docs.microsoft.com/en-us/dotnet/standard/security/cross-platform-cryptography#x509store).
     #>
-
     [CmdletBinding()]
     [OutputType([Security.Cryptography.X509Certificates.X509Certificate2])]
     param(
-        # The hostname to be matched with a certificate's subject alternate name.
-        [String] $HostName
+        # The hostname whose TLS certificate to find.
+        [String] $HostName,
+
+        # In addition to all other search criteria, if set, causes `Find-CTLSCertificate` to only return trusted 
+        # certificates, i.e. certificates that are issued by a certificate authority installed in the local machine or
+        # current user's [trusted certificate stores](https://docs.microsoft.com/en-us/dotnet/standard/security/cross-platform-cryptography#x509store).
+        # `Find-CTlsCertificate` calls the `Verify()` method on each certificate to determine if a certificate is
+        # trusted.
+        [switch] $Trusted
     )
 
     Set-StrictMode -Version 'Latest'
@@ -43,91 +97,116 @@ function Find-CTlsCertificate
         $HostName= "$($ipProperties.HostName).$($ipProperties.DomainName)"
     }
 
-    $installedCertificates = [Collections.ArrayList]::new()
+    $certificates = Get-CCertificate -StoreName My | Sort-Object -Property 'NotAfter' -Descending
 
-    $installedCertificates = Get-LocalCertificate | Sort-Object -Property 'NotAfter' -Descending
-
-    # Loop through certificates on local machine My store after ordering by NotAfter date descending to get
-    # certificate with longest valid date
-    foreach( $certificate in $installedCertificates )
+    $isFirstCert = $true
+    foreach( $certificate in $certificates )
     {
-        Write-Verbose -Message ("$($certificate.Thumbprint)  $($certificate.SubjectName.Name)")
+        if( $isFirstCert )
+        {
+            $isFirstCert = $false
+        }
+        else
+        {
+            Write-Verbose ('')
+        }
+
+        Write-Verbose -Message ("$($certificate.Thumbprint)")
+        Write-Verbose -Message ("$($certificate.SubjectName.Name)")
         if( $certificate.HasPrivateKey )
         {
-            Write-Verbose -message ("    private key")
+            Write-Verbose -message "    private key      $($true)"
         }
         else
         {
-            Write-Verbose -Message ("  ! private key")
+            Write-Verbose -Message "  ! private key      $($false)"
             continue
         }
 
+        $startDate = $certificate.NotBefore.ToString('yyyy-MM-dd HH:mm:ss')
         if( $certificate.NotBefore -lt  (Get-Date) )
         {
-            Write-Verbose -Message "   not before"
+            Write-Verbose -Message "    start date       $($startDate)"
         }
         else
         {
-            Write-Verbose -Message "  ! not before  $($certificate.NotBefore.ToString('yyyy-MM-dd HH:mm:ss'))"
+            Write-Verbose -Message "  ! start date       $($startDate)"
             continue
         }
 
+        $expirationDate = $certificate.NotAfter.ToString('yyyy-MM-dd HH:mm:ss')
         if( (Get-Date) -lt $certificate.NotAfter )
         {
-            Write-Verbose -Message "   not after"
+            Write-Verbose -Message "    expiration date  $($expirationDate)"
         }
         else
         {
-            Write-Verbose -Message "  ! not after  $($certificate.NotAfter.ToString('yyyy-MM-dd HH:mm:ss'))"
+            Write-Verbose -Message "  ! expiration date  $($expirationDate)"
             continue
         }
 
+        $dnsNameList = $certificate.DnsNameList -join ''', '''
         if( $certificate.DnsNameList -contains $HostName )
         {
-            Write-Verbose -Message ("    $($HostName)")
+            Write-Verbose -Message "    hostname         ['$($dnsNameList)']"
         }
         else
         {
-            Write-Verbose -Message ("  ! $($HostName) ($($certificate.DnsNameList -join ', '))")
+            Write-Verbose -Message "  ! hostname         ['$($dnsNameList)']"
             continue
         }
 
-        if( $certificate.EnhancedKeyUsageList | Where-Object { $_.FriendlyName -eq 'Server Authentication' } )
+        $keyUsages = $certificate.EnhancedKeyUsageList | Select-Object -ExpandProperty 'FriendlyName'
+        $keyUsages = $keyUsages -join ''', '''
+        if( $certificate.EnhancedKeyUsageList.Count -eq 0 )
         {
-            Write-Verbose -Message ("    Server Authentication")
+            Write-Verbose -Message "    key usage        Any"
+        }
+        elseif( $certificate.EnhancedKeyUsageList | Where-Object { $_.FriendlyName -eq 'Server Authentication' } )
+        {
+            Write-Verbose -Message "    key usage        ['$($keyUsages)']"
         }
         else
         {
-            Write-Verbose -Message ("  ! Server Authentication  ($($certificate.EnhancedKeyUsageList -join ','))")
+            Write-Verbose -Message "  ! key usage        ['$($keyUsages)']"
             continue
         }
 
-        # Do this last as it can be slow.
-        if( $certificate.Verify() )
+        if( $Trusted )
         {
-            Write-Verbose -Message ("    verified")
-        }
-        else
-        {
-            Write-Verbose -Message ("  ! verified")
-            continue
+            # Do this last as it can be slow.
+            if( $certificate.Verify() )
+            {
+                Write-Verbose -Message "    trusted          $($true)"
+            }
+            else
+            {
+                Write-Verbose -Message "  ! trusted          $($false)"
+                continue
+            }
         }
         
-        Write-Verbose -Message ('^--------------------------------------^')
+        Write-Verbose -Message '^--------------------------------------^'
         return $certificate
     }
 
-    $msg = "HTTPS certificate for $($HostName) does not exist. Make sure there is a certificate in the the LocalMachine " +
-       'or CurrentUser My certificate stores that:' + [Environment]::NewLine +
-       ' ' + [Environment]::NewLine +
-       '* has a private key' + [Environment]::NewLine +
-       '* hasn''t expired and whose "NotBefore"/"Valid From" date is in the past' + [Environment]::NewLine +
-       "* has subject ""CN=$($HostName)""; or whose Server Alternative Names contains ""$($HostName)""" +
-       [Environment]::NewLine +
-       '* has an enhanced key usage of "Server Authentication"' +
-       '* is trusted.' + [Environment]::NewLine +
-       ' ' + [Environment]::NewLine + 
-       'Use the -Verbose switch to see why each certificate was rejected.'
+    $isTrustedMsg = ''
+    if( $Trusted )
+    {
+        $isTrustedMsg = '* is trusted.' + [Environment]::NewLine
+    }
+    $msg = "TLS certificate for $($HostName) does not exist. Make sure there is a certificate in the My certificate " +
+           'store for the LocalMachine or CurrentUser that:' + [Environment]::NewLine +
+           ' ' + [Environment]::NewLine +
+           '* has a private key' + [Environment]::NewLine +
+           '* hasn''t expired and whose "NotBefore"/"Valid From" date is in the past' + [Environment]::NewLine +
+           "* has subject ""CN=$($HostName)""; or whose Server Alternative Name contains ""$($HostName)""" +
+           [Environment]::NewLine +
+           '* has an enhanced key usage of "Server Authentication" (or no enhanced key usage ' +
+           'metadata) ' + [Environment]::NewLine +
+           $isTrustedMsg +
+           ' ' + [Environment]::NewLine + 
+           'Use the -Verbose switch to see why each certificate was rejected.'
 
-    Write-Error -Message $msg
+    Write-Error -Message $msg -ErrorAction $ErrorActionPreference
 }
