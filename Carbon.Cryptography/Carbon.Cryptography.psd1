@@ -17,7 +17,7 @@
     RootModule = 'Carbon.Cryptography.psm1'
 
     # Version number of this module.
-    ModuleVersion = '1.0.4'
+    ModuleVersion = '1.1.0'
 
     # ID used to uniquely identify this module
     GUID = '225b9f63-3e3e-406c-87a0-33d34f30cd8e'
@@ -77,7 +77,9 @@
     FunctionsToExport = @(
         'Convert-CSecureStringToByte',
         'Convert-CSecureStringToString',
+        'Find-CTlsCertificate',
         'Get-CCertificate',
+        'Get-LocalCertificate',
         'Install-CCertificate',
         'Protect-CString',
         'Uninstall-CCertificate',
@@ -134,8 +136,10 @@
 
             # ReleaseNotes of this module
             ReleaseNotes = @'
-* Fixed: Unprotect-CString sometimes fails to decrypt a secret if the decryption key certificate is installed in
-  multiple certificate stores but some of those times without the private key.
+# 1.1.10 
+
+* Adding a `Find-CtlsCertificate` function to look through the local machine's My store for a certificate matching a 
+hostname being passed in as a parameter.
 '@
         } # End of PSData hashtable
 
