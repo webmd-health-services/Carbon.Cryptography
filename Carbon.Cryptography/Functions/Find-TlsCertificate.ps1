@@ -1,5 +1,5 @@
 
-function Find-CTlsCertificate
+function Find-TlsCertificate
 {
     <#
     .SYNOPSIS
@@ -97,7 +97,7 @@ function Find-CTlsCertificate
         $HostName= "$($ipProperties.HostName).$($ipProperties.DomainName)"
     }
 
-    $certificates = Get-CCertificate -StoreName My | Sort-Object -Property 'NotAfter' -Descending
+    $certificates = Get-Certificate -StoreName My | Sort-Object -Property 'NotAfter' -Descending
 
     $isFirstCert = $true
     foreach( $certificate in $certificates )

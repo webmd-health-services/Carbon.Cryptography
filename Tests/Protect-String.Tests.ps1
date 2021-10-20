@@ -10,7 +10,7 @@ $dsaKeyPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestDsaK
 $unprotectStringPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\Unprotect-String.ps1' -Resolve
 $testUserCred = Get-TestUserCredential -Name 'CPtString'
 
-Describe 'Protect-CString' {
+Describe 'Protect-String' {
 
     BeforeEach {
         $Global:Error.Clear()
@@ -22,7 +22,7 @@ Describe 'Protect-CString' {
         { [Convert]::FromBase64String( $String ) } | Should -Not -Throw
     }
     
-    if( (Test-COperatingSystem -IsWindows) )
+    if( (Test-TCOperatingSystem -IsWindows) )
     {
         It 'should protect string' {
             $cipherText = Protect-CString -String 'Hello World!' -ForUser
@@ -44,23 +44,6 @@ Describe 'Protect-CString' {
             }
         }
         
-        It 'should protect string for another user' {
-            # special chars to make sure they get handled correctly
-            $string = ' f u b a r '' " > ~!@#$%^&*()_+`-={}|:"<>?[]\;,./'
-            $protectedString = Protect-CString -String $string -Credential $testUserCred
-            $protectedString | Should -Not -BeNullOrEmpty "Failed to protect a string as user $($testUserCred.UserName)."
-
-            $decrypedString = Invoke-CPowerShell -ArgumentList @(
-                                                    '-NonInteractive',
-                                                    '-File',
-                                                    $unprotectStringPath,
-                                                    '-ProtectedString',
-                                                    $protectedString
-                                                ) `
-                                                -Credential $testUserCred
-            $decrypedString | Should -Be $string
-        }
-
         It 'should encrypt from cert store by thumbprint' {
             $cert = Get-ChildItem -Path cert:\* -Recurse |
                         Where-Object { $_ | Get-Member 'PublicKey' } |
@@ -152,7 +135,7 @@ Describe 'Protect-CString' {
         $passwordBytes = [Text.Encoding]::Unicode.GetBytes($password)
         $decryptedBytes = [Text.Encoding]::Unicode.GetBytes($decryptedPassword)
         $decryptedBytes.Length | Should -Be $passwordBytes.Length
-        $passwordBytes | ConvertTo-CBase64 | Should -Be ($decryptedPassword | ConvertTo-CBase64)
+        $passwordBytes | ConvertTo-TCBase64 | Should -Be ($decryptedPassword | ConvertTo-TCBase64)
     }
 
     It 'should convert passed objects to string' {
@@ -197,9 +180,31 @@ Describe 'Protect-CString' {
 
 }
 
+if( (Test-TCOperatingSystem -IsWindows) )
+{
+    Describe 'Protect-String.when protecting string as another user' {
+        It 'should protect that string using DPAPI' {
+            # special chars to make sure they get handled correctly
+            $string = ' f u b a r '' " > ~!@#$%^&*()_+`-={}|:"<>?[]\;,./'
+            $protectedString = Protect-CString -String $string -Credential $testUserCred
+            $protectedString | Should -Not -BeNullOrEmpty "Failed to protect a string as user $($testUserCred.UserName)."
+
+            $decrypedString = Invoke-TCPowerShell -ArgumentList @(
+                                                    '-NonInteractive',
+                                                    '-File',
+                                                    $unprotectStringPath,
+                                                    '-ProtectedString',
+                                                    $protectedString
+                                                ) `
+                                                -Credential $testUserCred
+            $decrypedString | Should -Be $string
+        }
+    }
+}
+
 foreach( $keySize in @( 128, 192, 256 ) )
 {
-    Describe ('Protect-CString when given a {0}-bit key' -f $keySize) {
+    Describe ('Protect-String.when given a {0}-bit key' -f $keySize) {
         $Global:Error.Clear()
         # Generate a secret that is too long for asymmetric encryption
         $secret = [Guid]::NewGuid().ToString() * 20
@@ -232,7 +237,7 @@ foreach( $keySize in @( 128, 192, 256 ) )
     }
 }
 
-Describe 'Protect-CString.when encryption fails' {
+Describe 'Protect-String.when encryption fails' {
     # Anyone know how to get DPAPI or AES encryption to fail?
     Context 'RSA' {
         It 'should fail' {

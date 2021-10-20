@@ -11,8 +11,8 @@ $testCertFriendlyName = 'Pup Test Certificate'
 $testCertSubject = 'CN=example.com'
 $testCertCertProviderPath = 'cert:\CurrentUser\My\{0}' -f $testCertificateThumbprint
 
-$onWindows = Test-COperatingSystem -IsWindows
-$onMacOS = Test-COperatingSystem -IsMacOS
+$onWindows = Test-TCOperatingSystem -IsWindows
+$onMacOS = Test-TCOperatingSystem -IsMacOS
 
 function Assert-TestCert
 {
@@ -95,7 +95,7 @@ function ThenReturnedCert
     }
 }
 
-Describe 'Get-CCertificate.when getting certificate from a file' {
+Describe 'Get-Certificate.when getting certificate from a file' {
     It ('should have Path property') {
         Init
         $cert = Get-CCertificate -Path $testCertPath
@@ -105,7 +105,7 @@ Describe 'Get-CCertificate.when getting certificate from a file' {
 
 if( $onWindows )
 {
-    Describe 'Get-CCertificate.when getting certificate by path from certificate store' {
+    Describe 'Get-Certificate.when getting certificate by path from certificate store' {
         It ('should have Path property') {
             Init
             $cert = Get-CCertificate -Path $testCertCertProviderPath
@@ -278,7 +278,7 @@ function ConvertTo-Parameter
 
 $itMsg = 'in { Location = <StoreLocation>; Store = <StoreName>; CustomStoreName = <CustomStoreName> } by { Thumbprint = ' +
          '<Thumbprint> ; Subject = <Subject> ; FriendlyName = <FriendlyName> }'
-Describe 'Get-CCertificate.when searching for a certificate' {
+Describe 'Get-Certificate.when searching for a certificate' {
     It $itMsg -TestCases $searchTestCases {
         param(
             $StoreLocation,
@@ -311,7 +311,7 @@ Describe 'Get-CCertificate.when searching for a certificate' {
     }
 }
 
-Describe 'Get-CCertificate.when certificate does not exist' {
+Describe 'Get-Certificate.when certificate does not exist' {
     It 'should not throw error when certificate does not exist' {
         Init
         $cert = Get-CCertificate -Thumbprint '1234567890abcdef1234567890abcdef12345678' -StoreLocation CurrentUser -StoreName My -ErrorAction SilentlyContinue
@@ -322,7 +322,7 @@ Describe 'Get-CCertificate.when certificate does not exist' {
 
 if( (Test-Path -Path 'Cert:\CurrentUser\CA') )
 {
-    Describe 'Get-CCertificate.when searching with CertificateAuthority store name' {
+    Describe 'Get-Certificate.when searching with CertificateAuthority store name' {
         It 'should get certificates in CA store' {
             Init
             $foundACert = $false
@@ -340,7 +340,7 @@ if( (Test-Path -Path 'Cert:\CurrentUser\CA') )
     }
 }
 
-Describe 'Get-CCertificate.when getting certificate with relative path' {
+Describe 'Get-Certificate.when getting certificate with relative path' {
     It 'should get certificate' {
         Init
         Push-Location -Path $PSScriptRoot
@@ -356,7 +356,7 @@ Describe 'Get-CCertificate.when getting certificate with relative path' {
     }
 }
 
-Describe 'Get-CCertificate.when certificate file is password protected' {
+Describe 'Get-Certificate.when certificate file is password protected' {
     It 'should get certificate' {
         Init
         $certPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificateWithPassword.pfx' -Resolve
@@ -372,7 +372,7 @@ Describe 'Get-CCertificate.when certificate file is password protected' {
     }
 }
 
-Describe 'Get-CCertificate.when certificate fails to load' {
+Describe 'Get-Certificate.when certificate fails to load' {
     It 'should include exception in error message' {
         Init
         $cert = Get-CCertificate -Path (Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificateWithPassword.pfx') -ErrorAction SilentlyContinue
@@ -384,7 +384,7 @@ Describe 'Get-CCertificate.when certificate fails to load' {
     }
 }
 
-Describe 'Get-CCertificate.when not using parameter name' {
+Describe 'Get-Certificate.when not using parameter name' {
     It 'should load by path' {
         $cert = Get-CCertificate $testCertPath
         $cert | Should -Not -BeNullOrEmpty

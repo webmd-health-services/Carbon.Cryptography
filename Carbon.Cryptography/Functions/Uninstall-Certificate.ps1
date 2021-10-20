@@ -1,5 +1,5 @@
 
-function Uninstall-CCertificate
+function Uninstall-Certificate
 {
     <#
     .SYNOPSIS

@@ -4,10 +4,10 @@ Set-StrictMode -Version 'Latest'
 
 & (Join-Path -Path $PSScriptRoot -ChildPath 'Initialize-Test.ps1' -Resolve)
 
-$onWindows = Test-COperatingSystem -IsWindows
+$onWindows = Test-TCOperatingSystem -IsWindows
 if( -not $onWindows )
 {
-    Write-Warning -Message ('TODO: Get Uninstall-CCertificate working on non-Windows platforms.')
+    Write-Warning -Message ('TODO: Get Uninstall-Certificate working on non-Windows platforms.')
     return
 }
 
@@ -40,7 +40,7 @@ function Init
     }
 }
 
-Describe 'Uninstall-CCertificate' {
+Describe 'Uninstall-Certificate' {
 
     It 'should remove certificate by certificate' {
         Init
@@ -165,7 +165,7 @@ function ThenCertificateUninstalled
     Join-Path -Path 'cert:\*\*' -ChildPath $TestCert.Thumbprint | Should -Not -Exist
 }
 
-Describe 'Uninstall-CCertificate.when given just the certificate thumbprint' {
+Describe 'Uninstall-Certificate.when given just the certificate thumbprint' {
     It 'should find and uninstall the certificate' {
         Init
         GivenAnInstalledCertificate
@@ -174,7 +174,7 @@ Describe 'Uninstall-CCertificate.when given just the certificate thumbprint' {
     }
 }
 
-Describe 'Uninstall-CCertificate.when given just the certificate thumbprint and installed in multiple stores' {
+Describe 'Uninstall-Certificate.when given just the certificate thumbprint and installed in multiple stores' {
     It 'should find and uninstall the certificate from all stores' @skipAdminTestParam {
         Init
         GivenAnInstalledCertificate
@@ -186,7 +186,7 @@ Describe 'Uninstall-CCertificate.when given just the certificate thumbprint and 
     }
 }
 
-Describe 'Uninstall-CCertificate.when piped thumbprint' {
+Describe 'Uninstall-Certificate.when piped thumbprint' {
     It 'should uninstall the certificate with that thumbprint' {
         Init
         GivenAnInstalledCertificate
@@ -195,7 +195,7 @@ Describe 'Uninstall-CCertificate.when piped thumbprint' {
     }
 }
 
-Describe 'Uninstall-CCertificate.when piped certificate object' {
+Describe 'Uninstall-Certificate.when piped certificate object' {
     It 'should uninstall that certificate' {
         Init
         GivenAnInstalledCertificate
@@ -204,7 +204,7 @@ Describe 'Uninstall-CCertificate.when piped certificate object' {
     }
 }
 
-Describe 'Uninstall-CCertificate.when piped multiple thumbprints' {
+Describe 'Uninstall-Certificate.when piped multiple thumbprints' {
     It 'should uninstall all the certificates' {
         Init
         GivenAnInstalledCertificate
@@ -214,7 +214,7 @@ Describe 'Uninstall-CCertificate.when piped multiple thumbprints' {
 }
 
 # This test ensures that certificates are uninstalled from LocalMachine stores *first*, since they will also show up in CurrentUser stores and if SYSTEM deletes the certificate in a headless process from the CurrentUser stores first, it will fail.
-Describe 'Uninstall-CCertificate.when local machine cert shows up in current user store' {
+Describe 'Uninstall-Certificate.when local machine cert shows up in current user store' {
     It 'should delete from local machine store first' @skipAdminTestParam {
         Init
         GivenAnInstalledCertificate
@@ -228,7 +228,7 @@ Describe 'Uninstall-CCertificate.when local machine cert shows up in current use
 
 if( $skipAdminTests )
 {
-    $msg = 'Tests to ensure Uninstall-CCertificate works over remoting were not run. Remoting tests require ' +
+    $msg = 'Tests to ensure Uninstall-Certificate works over remoting were not run. Remoting tests require ' +
             'administrator rights. Make sure to run these tests as an administrator.'
     Write-Warning -Message $msg
 }

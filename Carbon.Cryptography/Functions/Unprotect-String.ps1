@@ -1,5 +1,5 @@
 
-function Unprotect-CString
+function Unprotect-String
 {
     <#
     .SYNOPSIS
@@ -197,7 +197,7 @@ function Unprotect-CString
                     $passwordParam = @{ Password = $Password }
                 }
 
-                $certificates = Get-CCertificate -Path $PrivateKeyPath @passwordParam
+                $certificates = Get-Certificate -Path $PrivateKeyPath @passwordParam
                 $count = $certificates | Measure-Object | Select-Object -ExpandProperty 'Count'
                 if( $count -gt 1 )
                 {

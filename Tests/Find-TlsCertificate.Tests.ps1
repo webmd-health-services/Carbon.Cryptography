@@ -110,7 +110,7 @@ function WhenFindingTlsCertificate
 
     $installedCertificates = $script:mockedCertificates
 
-    Mock -CommandName 'Get-CCertificate' `
+    Mock -CommandName 'Get-Certificate' `
          -ModuleName 'Carbon.Cryptography' `
          -MockWith { $installedCertificates }.GetNewClosure()
 
@@ -128,7 +128,7 @@ function WhenFindingTlsCertificate
     $script:foundCert = Find-CTlsCertificate @optionalParams
 }
 
-Describe 'Find-CTlsCertificate.when a matching certificate exists' {
+Describe 'Find-TlsCertificate.when a matching certificate exists' {
     It 'should find a certificate' {
         Init
         GivenCertificate -For 'cert1'
@@ -141,7 +141,7 @@ Describe 'Find-CTlsCertificate.when a matching certificate exists' {
     }
 }
 
-Describe 'Find-CTlsCertificate.when no certificates match hostname' {
+Describe 'Find-TlsCertificate.when no certificates match hostname' {
     It 'should not find a certificate' {
         Init
         GivenCertificate -For 'does not match hostname'
@@ -151,7 +151,7 @@ Describe 'Find-CTlsCertificate.when no certificates match hostname' {
     }
 }
 
-Describe 'Find-CTlsCertificate.when no private key exists' {
+Describe 'Find-TlsCertificate.when no private key exists' {
     It 'should not find a certificate' {
         Init
         GivenCertificate -For 'noprivatekey.com' -WithNoPrivateKey
@@ -160,7 +160,7 @@ Describe 'Find-CTlsCertificate.when no private key exists' {
     }
 }
 
-Describe 'Find-CTlsCertificate.when subject alternate name matches' {
+Describe 'Find-TlsCertificate.when subject alternate name matches' {
     It 'should find the certificate' {
         Init
         GivenCertificate -For $machineName -WithDnsNames ('fake.net', 'fake2.net')
@@ -169,7 +169,7 @@ Describe 'Find-CTlsCertificate.when subject alternate name matches' {
     }
 }
 
-Describe 'Find-CTlsCertificate.when key usage is not Server Authentication' {
+Describe 'Find-TlsCertificate.when key usage is not Server Authentication' {
     It 'should not find a certificate' {
         Init
         GivenCertificate -For 'invalidkeyusage.com' -WithUsages ('Remote Desktop Authentication', 'Client Authentication') 
@@ -178,7 +178,7 @@ Describe 'Find-CTlsCertificate.when key usage is not Server Authentication' {
     }
 }
 
-Describe 'Find-CTlsCertificate.when key usage is Server Authentication' {
+Describe 'Find-TlsCertificate.when key usage is Server Authentication' {
     It 'should not find a certificate' {
         Init
         GivenCertificate -For 'validkeyusage.com' -WithUsages ('Remote Desktop Authentication', 'Server Authentication') 
@@ -187,7 +187,7 @@ Describe 'Find-CTlsCertificate.when key usage is Server Authentication' {
     }
 }
 
-Describe 'Find-CTlsCertificate.when certificate is trusted' {
+Describe 'Find-TlsCertificate.when certificate is trusted' {
     It 'should not find a certificate' {
         Init
         GivenCertificate -For 'trusted.com' -ThatIsTrusted
@@ -196,7 +196,7 @@ Describe 'Find-CTlsCertificate.when certificate is trusted' {
     }
 }
 
-Describe 'Find-CTlsCertificate.when certificate is not trusted' {
+Describe 'Find-TlsCertificate.when certificate is not trusted' {
     It 'should not find a certificate' {
         Init
         GivenCertificate -For 'nottrusted.com'
@@ -205,7 +205,7 @@ Describe 'Find-CTlsCertificate.when certificate is not trusted' {
     }
 }
 
-Describe 'Find-CTlsCertificate.when certificate is expired' {
+Describe 'Find-TlsCertificate.when certificate is expired' {
     It 'should not find a certificate' {
         Init
         GivenCertificate -For 'expired.com' -ThatExpires (Get-Date).AddDays(-1)
@@ -214,7 +214,7 @@ Describe 'Find-CTlsCertificate.when certificate is expired' {
     }
 }
 
-Describe 'Find-CTlsCertificate.when certificate has not started' {
+Describe 'Find-TlsCertificate.when certificate has not started' {
     It 'should not find a certificate' {
         Init
         GivenCertificate -For 'notstarted.com' -ThatStarts (Get-Date).AddDays(1)
@@ -223,7 +223,7 @@ Describe 'Find-CTlsCertificate.when certificate has not started' {
     }
 }
 
-Describe 'Find-CTlsCertificate.when getting certificate for current machine' {
+Describe 'Find-TlsCertificate.when getting certificate for current machine' {
     It 'should return cert that matches hostname from global IP properties' {
         Init
         $ipProperties = [Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties()
@@ -234,7 +234,7 @@ Describe 'Find-CTlsCertificate.when getting certificate for current machine' {
     }
 }
 
-Describe 'Find-CTlsCertificate.when ignoring that a certificate is not found' {
+Describe 'Find-TlsCertificate.when ignoring that a certificate is not found' {
     It 'should not fail' {
         Init
         WhenFindingTlsCertificate 'doesnotexist.com' -ErrorAction Ignore

@@ -17,7 +17,7 @@
     RootModule = 'Carbon.Cryptography.psm1'
 
     # Version number of this module.
-    ModuleVersion = '1.1.0'
+    ModuleVersion = '2.0.0'
 
     # ID used to uniquely identify this module
     GUID = '225b9f63-3e3e-406c-87a0-33d34f30cd8e'
@@ -77,15 +77,14 @@
 
     # Functions to export from this module. Only list public function here.
     FunctionsToExport = @(
-        'Convert-CSecureStringToByte',
-        'Convert-CSecureStringToString',
-        'Find-CTlsCertificate',
-        'Get-CCertificate',
-        'Get-LocalCertificate',
-        'Install-CCertificate',
-        'Protect-CString',
-        'Uninstall-CCertificate',
-        'Unprotect-CString'
+        'Convert-SecureStringToByte',
+        'Convert-SecureStringToString',
+        'Find-TlsCertificate',
+        'Get-Certificate',
+        'Install-Certificate',
+        'Protect-String',
+        'Uninstall-Certificate',
+        'Unprotect-String'
     )
 
     # Cmdlets to export from this module. By default, you get a script module, so there are no cmdlets.
@@ -110,7 +109,7 @@
     # HelpInfoURI = ''
 
     # Default prefix for commands exported from this module. Override the default prefix using Import-Module -Prefix.
-    # DefaultCommandPrefix = ''
+    DefaultCommandPrefix = 'C'
 
     # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
     PrivateData = @{

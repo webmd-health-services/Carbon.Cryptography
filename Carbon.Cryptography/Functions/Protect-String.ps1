@@ -1,5 +1,5 @@
 
-function Protect-CString
+function Protect-String
 {
     <#
     .SYNOPSIS
@@ -220,7 +220,7 @@ function Protect-CString
             }
             elseif( $PSCmdlet.ParameterSetName -eq 'RsaByPath' )
             {
-                $Certificate = Get-CCertificate -Path $PublicKeyPath
+                $Certificate = Get-Certificate -Path $PublicKeyPath
                 if( -not $Certificate )
                 {
                     return
@@ -254,7 +254,7 @@ function Protect-CString
         {
             if( $String -is [securestring] )
             {
-                $unicodeBytes = Convert-CSecureStringToByte -SecureString $String
+                $unicodeBytes = Convert-SecureStringToByte -SecureString $String
             }
             # Unicode takes up two bytes, so the max length of strings we can encrypt is cut from about 472 characters
             # to 236. Let's re-encode in UTF-8, which only uses one byte per character. This also maintains
@@ -273,7 +273,7 @@ function Protect-CString
                 if( $PSCmdlet.ParameterSetName -eq 'DPAPIForUser' )
                 {
                     $protectStringPath = Join-Path -Path $moduleBinRoot -ChildPath 'Protect-String.ps1' -Resolve
-                    $encodedString = Protect-CString -String $String -ForComputer
+                    $encodedString = Protect-String -String $String -ForComputer
                     $powershellArgs = @(
                         '-ExecutionPolicy',
                         'ByPass',
