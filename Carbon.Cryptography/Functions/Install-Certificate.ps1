@@ -1,5 +1,5 @@
 
-function Install-CCertificate
+function Install-Certificate
 {
     <#
     .SYNOPSIS
@@ -123,7 +123,7 @@ function Install-CCertificate
                     [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
             }
         }
-        $Certificate = Get-CCertificate -Path $Path -Password $Password @keyStorageFlags
+        $Certificate = Get-Certificate -Path $Path -Password $Password @keyStorageFlags
     }
     else
     {

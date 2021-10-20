@@ -22,8 +22,12 @@ $ErrorActionPreference = 'Stop'
 $InformationPreference = 'Continue'
 
 & {
-    Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'PSModules\Carbon' -Resolve) -Verbose:$false
-    Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'PSModules\Carbon.Core' -Resolve) -Verbose:$false
+    Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'PSModules\Carbon' -Resolve) `
+                  -Verbose:$false `
+                  -Function @('Install-CUser', 'Grant-CPermission')
+    Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'PSModules\Carbon.Core' -Resolve) `
+                  -Verbose:$false `
+                  -Function @('Test-COperatingSystem', 'Invoke-CPowerShell')
 }
 
 $passwordPath = Join-Path -Path $PSScriptRoot -ChildPath 'Tests\.password'
@@ -57,12 +61,14 @@ $users =
     Import-LocalizedData -BaseDirectory (Join-Path -Path $PSScriptRoot -ChildPath 'Tests') -FileName 'users.psd1' |
     ForEach-Object { $_['Users'] } |
     ForEach-Object { 
-        $_['Description'] = "Carbon.Core $($_['For']) test user."
+        $_['Description'] = "Carbon.Cryptography $($_['For']) test user."
         [pscustomobject]$_ | Write-Output
     }
 
 foreach( $user in $users )
 {
+    $credential = [pscredential]::New($user.Name, (ConvertTo-SecureString $password -AsPlainText -Force))
+
     if( (Test-COperatingSystem -IsWindows) )
     {
         $maxLength = $user.Description.Length
@@ -71,7 +77,6 @@ foreach( $user in $users )
             $maxLength = 48
         }
         $description = $user.Description.Substring(0, $maxLength)
-        $credential = [pscredential]::New($user.Name, (ConvertTo-SecureString $password -AsPlainText -Force))
         Install-CUser -Credential $credential -Description $description -UserCannotChangePassword
     }
     elseif( (Test-COperatingSystem -IsMacOS) )
@@ -84,7 +89,7 @@ foreach( $user in $users )
         Write-Verbose "  Found highest user ID ""$($newUid)""."
         $newUid += 1
 
-        $username = $user.Name
+        $username = $credential.UserName
 
         Write-Verbose "  Creating $($username) (uid: $($newUid))"
         # Create the user account
@@ -99,14 +104,15 @@ foreach( $user in $users )
     }
     elseif( (Test-COperatingSystem -IsLinux) )
     {
-        $userExists = Get-Content '/etc/passwd' | Where-Object { $_ -match "^$([regex]::Escape($user.Name))\b"}
-        if( $userExists )
-        {
-            continue
-        }
+        $userExists =
+            Get-Content '/etc/passwd' |
+            Where-Object { $_ -match "^$([regex]::Escape($credential.UserName))\b"}
 
-        Write-Verbose -Message ("Adding user ""$($user.Name)"".")
-        $encryptedPassword = $password | openssl passwd -stdin -salt $salt
-        sudo useradd -p $encryptedPassword -m $user.Name --comment $user.Description
+        if( -not $userExists )
+        {
+            Write-Verbose -Message ("Adding user ""$($credential.UserName)"".")
+            $encryptedPassword = $password | openssl passwd -stdin -salt $salt
+            sudo useradd -p $encryptedPassword -m $credential.UserName --comment $user.Description
+        }
     }
 }

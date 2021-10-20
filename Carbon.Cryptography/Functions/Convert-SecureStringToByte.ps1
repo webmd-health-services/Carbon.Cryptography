@@ -1,5 +1,5 @@
 
-function Convert-CSecureStringToByte
+function Convert-SecureStringToByte
 {
     <#
     .SYNOPSIS

@@ -1,7 +1,28 @@
 
+# 2.0.0
+
+## Upgrade Instructions
+
+`Carbon.Cryptography` now uses the `DefaultCommandPrefix` module manifest metadata to add the `C` prefix to its
+commands. If you're using the `Import-Module` cmdlet's `-Function` parameter when importing `Carbon.Cryptography`,
+remove the `C` prefix from the function names.
+
+The `Get-LocalCertificate` function was removed. Replace any usages of `Get-LocalCertificate` with `Get-CCertificate`. 
+
+The `Remove-Certificate` alias was removed. Replace usages of the `Remove-Certificate` alias with 
+`Uninstall-CCertificatte`.
+
+## Changes
+
+* `Carbon.Cryptography` now uses the `DefaultCommandPrefix` module manifest metadata to add the `C` prefix to its
+  commands.
+* Removed `Get-LocalCertificate` function (it was an internal function that was accidentally exported from the module).
+* Removed `Remove-Certificate` alias to `Uninstall-CCertificate`.
+
+
 # 1.1.0
 
-* Added `Find-CtlsCertificate` function that finds an HTTPS certificate that matches a given hostname, searching the My
+* Added `Find-CTlsCertificate` function that finds an HTTPS certificate that matches a given hostname, searching the My
   store for the local machine or current user.
 * Fixed: On Linux and macOS, `Get-CCertificate` doesn't return certificates from X509 certificate stores.
 * When getting a certificate out of the certificate stores, `Get-CCertificate` no longer requires a location, store

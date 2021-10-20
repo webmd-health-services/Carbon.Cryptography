@@ -16,8 +16,8 @@ $rsaCipherText = Protect-CString -String $secret -PublicKeyPath $privateKeyPath
 
 function Reset
 {
-    # Uninstall-CCertificate only works on Windows
-    if( -not (Test-COperatingSystem -IsWindows) )
+    # Uninstall-Certificate only works on Windows
+    if( -not (Test-TCOperatingSystem -IsWindows) )
     {
         return
     }
@@ -41,7 +41,7 @@ function Reset
     }
 }
 
-Describe 'Unprotect-CString' {
+Describe 'Unprotect-String' {
     BeforeEach {
         $Global:Error.Clear()
     }
@@ -50,7 +50,7 @@ Describe 'Unprotect-CString' {
         Reset
     }
 
-    if( (Test-COperatingSystem -IsWindows) )
+    if( (Test-TCOperatingSystem -IsWindows) )
     {
         It 'should unprotect string' {
             $originalText = [Guid]::NewGuid().ToString()
@@ -214,7 +214,7 @@ Describe 'Unprotect-String.AES' {
     }
 }
 
-Describe 'Unprotect-CString.when user does not have access to private key' {
+Describe 'Unprotect-String.when user does not have access to private key' {
     It 'should fail' {
         $cert = Get-CCertificate -Path $privateKeyPath
         $cert | Add-member -MemberType NoteProperty -Name 'PrivateKey' -Value $null -Force
@@ -225,8 +225,8 @@ Describe 'Unprotect-CString.when user does not have access to private key' {
     }
 }
 
-Describe 'Unprotect-CString.when decryption fails' {
-    if( (Test-COperatingSystem -IsWindows) )
+Describe 'Unprotect-String.when decryption fails' {
+    if( (Test-TCOperatingSystem -IsWindows) )
     {
         Context 'DPAPI' {
             It 'should fail' {
@@ -260,7 +260,7 @@ Describe 'Unprotect-CString.when decryption fails' {
                 $Global:Error.Clear()
                 $key = 'passwordpasswordpasswordpassword'
                 $fakeCipherText =
-                    "$('iv' * 8)not encrypted)" | ConvertTo-CBase64 -Encoding ([Text.Encoding]::UTF8)
+                    "$('iv' * 8)not encrypted)" | ConvertTo-TCBase64 -Encoding ([Text.Encoding]::UTF8)
                 Unprotect-CString -ProtectedString $fakeCipherText `
                                   -Key (ConvertTo-SecureString $key -AsPlainText -Force) `
                                   -ErrorAction SilentlyContinue |

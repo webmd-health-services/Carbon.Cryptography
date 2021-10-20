@@ -1,5 +1,5 @@
 
-function Uninstall-CCertificate
+function Uninstall-Certificate
 {
     <#
     .SYNOPSIS
@@ -223,6 +223,3 @@ function Uninstall-CCertificate
         } -ArgumentList $Thumbprint,$StoreLocation,$StoreName,$CustomStoreName
     }
 }
-
-Set-Alias -Name 'Remove-Certificate' -Value 'Uninstall-CCertificate'
-

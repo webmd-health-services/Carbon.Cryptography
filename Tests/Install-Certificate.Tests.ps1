@@ -10,11 +10,11 @@ $password = ConvertTo-SecureString -String 'password' -AsPlainText -Force
 $TestCertProtectedPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificateWithPassword.pfx' -Resolve
 $testCertProtected = New-Object 'Security.Cryptography.X509Certificates.X509Certificate2' $TestCertProtectedPath, $password
 
-$onWindows = Test-COperatingSystem -IsWindows
+$onWindows = Test-TCOperatingSystem -IsWindows
 
 if( -not $onWindows )
 {
-    Write-Warning -Message ('TODO: Get Install-CCertificate working on non-Windows platforms.')
+    Write-Warning -Message ('TODO: Get Install-Certificate working on non-Windows platforms.')
     return
 }
 
@@ -202,7 +202,7 @@ $locations = & {
     }
 }
 
-Describe "Install-CCertificate" {
+Describe 'Install-Certificate' {
     BeforeEach { Init }
     AfterEach { Reset }
 
@@ -284,7 +284,7 @@ Describe "Install-CCertificate" {
 
 foreach( $location in $locations )
 {
-    Describe "Install-CCertificate.$($location).when installing in custom store" {
+    Describe "Install-Certificate.$($location).when installing in custom store" {
         AfterEach { Reset }
         It 'should install certificate in the custom store' {
             Init
@@ -321,7 +321,7 @@ foreach( $location in $locations )
         }
     }
 
-    Describe "Install-CCertificate.$($location).when certificate is already installed" {
+    Describe "Install-Certificate.$($location).when certificate is already installed" {
         AfterEach { Reset }
         It 'should not re-install it' {
             $fileCount = Measure-PhysicalStore -Location $location
@@ -345,7 +345,7 @@ foreach( $location in $locations )
         }
     }
 
-    Describe "Install-CCertificate.$($location).when certificate is already installed and forcing install" {
+    Describe "Install-Certificate.$($location).when certificate is already installed and forcing install" {
         AfterEach { Reset }
         It 'should not re-install it' {
             $fileCount = Measure-PhysicalStore -Location $location
@@ -370,7 +370,7 @@ foreach( $location in $locations )
         }
     }
 
-    Describe "Install-CCertificate.$($location).when requesting the installed certificate be returned" {
+    Describe "Install-Certificate.$($location).when requesting the installed certificate be returned" {
         AfterEach { Reset }
         Context 'certificate is not installed' {
             It 'should return the certificate' {
@@ -393,7 +393,7 @@ foreach( $location in $locations )
 
 if( $skipRemotingTests )
 {
-    $msg = 'Tests to ensure Install-CCertificate works over remoting were not run. Remoting tests require ' +
+    $msg = 'Tests to ensure Install-Certificate works over remoting were not run. Remoting tests require ' +
             'administrator rights. Make sure to run these tests as an administrator.'
     Write-Warning -Message $msg
 }
