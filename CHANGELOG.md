@@ -22,7 +22,7 @@ The `Remove-Certificate` alias was removed. Replace usages of the `Remove-Certif
 
 # 1.1.0
 
-* Added `Find-CtlsCertificate` function that finds an HTTPS certificate that matches a given hostname, searching the My
+* Added `Find-CTlsCertificate` function that finds an HTTPS certificate that matches a given hostname, searching the My
   store for the local machine or current user.
 * Fixed: On Linux and macOS, `Get-CCertificate` doesn't return certificates from X509 certificate stores.
 * When getting a certificate out of the certificate stores, `Get-CCertificate` no longer requires a location, store
