@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Configuration>
+  <ViewDefinitions>
+    <View>
+      <Name>CarbonCryptoCertTable</Name>
+      <GroupBy>
+        <Label>Store</Label>
+        <ScriptBlock>"$($_.StoreLocation)$([IO.Path]::DirectorySeparatorChar)$($_.StoreName)"</ScriptBlock>
+      </GroupBy>
+      <ViewSelectedBy>
+        <TypeName>Carbon.Cryptography.X509Certificate2</TypeName>
+      </ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader>
+            <Width>13</Width>
+          </TableColumnHeader>
+          <TableColumnHeader>
+            <Width>20</Width>
+          </TableColumnHeader>
+          <TableColumnHeader>
+            <Width>40</Width>
+          </TableColumnHeader>
+          <TableColumnHeader />
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <TableColumnItems>
+              <TableColumnItem>
+                <PropertyName>StoreLocation</PropertyName>
+              </TableColumnItem>
+              <TableColumnItem>
+                <PropertyName>StoreName</PropertyName>
+              </TableColumnItem>
+              <TableColumnItem>
+                <PropertyName>Thumbprint</PropertyName>
+              </TableColumnItem>
+              <TableColumnItem>
+                <PropertyName>Subject</PropertyName>
+              </TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+  </ViewDefinitions>
+</Configuration>
