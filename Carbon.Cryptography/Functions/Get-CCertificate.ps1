@@ -12,26 +12,35 @@ function Get-CCertificate
     installing the certificate in a Windows certificate store, and you want to customize the key storage flags, pass
     the flags to the `KeyStorageFlags` parameter.
 
-    If the path is to a certificate in PowerShell's certificate drive (i.e. the path begins with `cert:\`), the
-    `Password` and `KeyStorageFlags` are ignored. The certificate is returned. Wildcards allowed.
+    On Windows, the path can also be a path to a certificate in PowerShell's certificate drive (i.e. the path begins
+    with `cert:\`), the `Password` and `KeyStorageFlags` are ignored. The certificate is returned. Wildcards allowed.
 
-    You can search the Windows certificate stores for a certificate a specific thumbprint or friendly name by passing
-    with the `Thumbprint` and `FriendlyName` parameters, respectively. `Get-CCertificate` will search all stores for all
-    locations. If you know the store or location of the certificate, pass those to the `StoreName` and `StoreLocation`
-    parameters, respectively. If the certificate is in a custom store, pass the store's name to the `CustomStoreName`
-    parameter.
+    When called with no parameters, `Get-CCertificate` returns all certificates in all certificate locations and stores
+    (except stores with custom name). You can filter what certificates to return using any combination of these
+    parameters. A certificate must match all filters to be returned.
 
-    `Get-CCertificate` adds a `Path` parameter which is the path where the certificate was loaded from the file system
-    or the `cert:` path to the certificate in the Windows certificate store.
+    * `StoreLocation`: only return certificates in one of the store locations, `CurrentUser` or `LocalMachine`.
+    * `StoreName`: only return certificates from this store. Can't be used with `CustomStoreName`.
+    * `CustomStoreName`: only return certificates from this custom store name. Can't be used with `StoreName`.
+    * `Thumbprint`: only return certificates with this thumbprint. Wildcards allowed.
+    * `FriendlyName`: only return certificates with this friendly name. Wildcards allowed. Friendly names are
+      Windows-only. If you pass a friendly name on other platforms, you'll get no certificates back.
+    * `Subject`: only return certificates with this subject. Wildcards allowed.
+
+    `Get-CCertificate` adds a `Path` property to the returned objects that is the file system path where the certificate
+    was loaded from, or, if loaded from a Windows certificate store, the path to the certificate in the `cert:` drive.
+
+    When loading certificates from a certificate store, `Get-CCertificate` adds `StoreLocation` and `StoreName`
+    properties for the store where the certificate was found.
 
     .OUTPUTS
-    System.Security.Cryptography.x509Certificates.X509Certificate2. The X509Certificate2 certificates that were found, or `$null`.
+    System.Security.Cryptography.x509Certificates.X509Certificate2. The X509Certificate2 certificates that were found,
+    or `$null`.
 
     .EXAMPLE
     Get-CCertificate -Path C:\Certificates\certificate.cer -Password MySuperSecurePassword
 
-    Gets an X509Certificate2 object representing the certificate.cer file. Wildcards *not* supported when using a file
-    system path.
+    Gets an X509Certificate2 object representing the certificate.cer file.
 
     .EXAMPLE
     Get-CCertificate -Thumbprint a909502dd82ae41433e6f83886b00d4277a32a7b -StoreName My -StoreLocation LocalMachine
@@ -40,10 +49,35 @@ function Get-CCertificate
     Machine.
 
     .EXAMPLE
-    Get-CCertificate -FriendlyName 'Development Certificate' -StoreLocation CurrentUser -StoreName TrustedPeople
+    Get-CCertificate
 
-    Gets the X509Certificate2 whose friendly name is Development Certificate from the Current User's Trusted People
-    certificate store.
+    Demonstrates how to get all certificates in all current user and local machine stores.
+
+    .EXAMPLE
+    Get-CCertificate -Thumbprint a909502dd82ae41433e6f83886b00d4277a32a7b
+
+    Demonstrates how to find certificates with a given thumbprints.
+
+    .EXAMPLE
+    Get-CCertificate -StoreLocation CurrentUser
+
+    Demonstrates how to get all certificates for a specific location.
+
+    .EXAMPLE
+    Get-CCertificate -StoreName My
+
+    Demonstrates how to get all certificates from a specific store.
+
+    .EXAMPLE
+    Get-CCertificate -FriendlyName 'My Friendly Name'
+
+    Demonstrates how to get all certificates with a specific friendly name. Friendly names are Windows-only. No
+    certificates will be returned when using this parameter on non-Windows platforms.
+
+    .EXAMPLE
+    Get-CCertificate -Subject 'CN=Carbon.Cryptography'
+
+    Demonstrates how to find all certificates in all stores that have a specific subject.
 
     .EXAMPLE
     Get-CCertificate -Thumbprint $thumbprint -CustomStoreName 'SharePoint' -StoreLocation LocalMachine
@@ -55,49 +89,54 @@ function Get-CCertificate
     Get-CCertificate -Path 'cert:\CurrentUser\a909502dd82ae41433e6f83886b00d4277a32a7b'
 
     Demonstrates how to get a certificate out of a Windows certificate store with its certificate path. Wildcards
-    supported.
+    supported. The `cert:` drive only exists on Windows. If you use a `cert:` path on non-Windows platforms, you'll get
+    an error.
     #>
-    [CmdletBinding(DefaultParameterSetName='ByPath')]
+    [CmdletBinding(DefaultParameterSetName='FromCertificateStore')]
     [OutputType([Security.Cryptography.X509Certificates.X509Certificate2])]
     param(
+        # The path to the certificate. On Windows, this can also be a certificate path, e.g. `cert:\`. Wildcards
+        # supported.
         [Parameter(Mandatory, ParameterSetName='ByPath', Position=0)]
-        # The path to the certificate. Can be a file system path or a certificate path, e.g. `cert:\`. Wildcards supported.
-        [String]$Path,
+        [String] $Path,
 
-        [Parameter(ParameterSetName='ByPath')]
         # The password to the certificate. Must be a `[securestring]`.
-        [securestring]$Password,
-
         [Parameter(ParameterSetName='ByPath')]
-        # The storage flags to use when loading a certificate file. This controls where/how you can store the certificate in the certificate stores later. Use the `-bor` operator to combine flags.
-        [Security.Cryptography.X509Certificates.X509KeyStorageFlags]$KeyStorageFlags,
+        [securestring] $Password,
 
-        [Parameter(Mandatory, ParameterSetName='ByThumbprint')]
-        [Parameter(Mandatory, ParameterSetName='ByThumbprintCustomStoreName')]
-        # The certificate's thumbprint.
-        [String]$Thumbprint,
+        # The storage flags to use when loading a certificate file. This controls where/how you can store the
+        # certificate in the certificate stores later. Use the `-bor` operator to combine flags.
+        [Parameter(ParameterSetName='ByPath')]
+        [Security.Cryptography.X509Certificates.X509KeyStorageFlags] $KeyStorageFlags,
 
-        [Parameter(Mandatory, ParameterSetName='ByFriendlyName')]
-        [Parameter(Mandatory, ParameterSetName='ByFriendlyNameCustomStoreName')]
-        # The friendly name of the certificate.
-        [String]$FriendlyName,
+        # The certificate's thumbprint. Wildcards allowed.
+        [Parameter(ParameterSetName='FromCertificateStore')]
+        [Parameter(ParameterSetName='FromCertificateStoreCustomStore')]
+        [String] $Thumbprint,
 
-        [Parameter(Mandatory, ParameterSetName='ByFriendlyName')]
-        [Parameter(Mandatory, ParameterSetName='ByFriendlyNameCustomStoreName')]
-        [Parameter(Mandatory, ParameterSetName='ByThumbprint')]
-        [Parameter(Mandatory, ParameterSetName='ByThumbprintCustomStoreName')]
+        # The friendly name of the certificate. Wildcards allowed. Friendly name is Windows-only. If you search by
+        # friendly name on other platforms, you'll never get any certificates back.
+        [Parameter(ParameterSetName='FromCertificateStore')]
+        [Parameter(ParameterSetName='FromCertificateStoreCustomStore')]
+        [String] $FriendlyName,
+
+        # The subject of the certificate. Wildcards allowed.
+        [Parameter(ParameterSetName='FromCertificateStore')]
+        [Parameter(ParameterSetName='FromCertificateStoreCustomStore')]
+        [String] $Subject,
+
         # The location of the certificate's store.
-        [Security.Cryptography.X509Certificates.StoreLocation]$StoreLocation,
+        [Parameter(ParameterSetName='FromCertificateStore')]
+        [Parameter(ParameterSetName='FromCertificateStoreCustomStore')]
+        [Security.Cryptography.X509Certificates.StoreLocation] $StoreLocation,
 
-        [Parameter(Mandatory, ParameterSetName='ByFriendlyName')]
-        [Parameter(Mandatory, ParameterSetName='ByThumbprint')]
         # The name of the certificate's store.
-        [Security.Cryptography.X509Certificates.StoreName]$StoreName,
+        [Parameter(ParameterSetName='FromCertificateStore')]
+        [Security.Cryptography.X509Certificates.StoreName] $StoreName,
 
-        [Parameter(Mandatory, ParameterSetName='ByFriendlyNameCustomStoreName')]
-        [Parameter(Mandatory, ParameterSetName='ByThumbprintCustomStoreName')]
         # The name of the non-standard, custom store.
-        [String]$CustomStoreName
+        [Parameter(Mandatory, ParameterSetName='FromCertificateStoreCustomStore')]
+        [String] $CustomStoreName
     )
 
     Set-StrictMode -Version 'Latest'
@@ -177,59 +216,162 @@ function Get-CCertificate
                     {
                         $ex = $ex.InnerException
                     }
-                    Write-Error -Message ('Failed to create X509Certificate2 object from file ''{0}'': {1}' -f $item.FullName,$ex.Message)
+                    $msg = "Failed to create X509Certificate2 object from file ""$($item.FullName)"": $($ex)"
+                    Write-Error -Message $msg
                 }
             }
         }
+        return
     }
-    else
+
+    if( $PSCmdlet.ParameterSetName -like 'FromCertificateStore*' )
     {
-        $storeLocationPath = '*'
+        $foundCerts = @{}
+        Write-Debug -Message "[$($MyInvocation.MyCommand.Name)]"
+        $locationWildcard = '*'
         if( $StoreLocation )
         {
-            $storeLocationPath = $StoreLocation
+            $locationWildcard = $StoreLocation.ToString()
         }
+        Write-Debug -Message "  $($locationWildcard)"
 
-        $storeNamePath = '*'
-        if( $PSCmdlet.ParameterSetName -like '*CustomStoreName' )
-        {
-            $storeNamePath = $CustomStoreName
-        }
-        else
-        {
-            $storeNamePath = $StoreName
-            if( $StoreName -eq [Security.Cryptography.X509Certificates.StoreName]::CertificateAuthority )
-            {
-                $storeNamePath = 'CA'
-            }
-        }
+        [Security.Cryptography.X509Certificates.StoreLocation] $currentUserLocation =
+            [Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser
+        [Security.Cryptography.X509Certificates.StoreLocation] $localMachineLocation =
+            [Security.Cryptography.X509Certificates.StoreLocation]::LocalMachine
 
-        if( $pscmdlet.ParameterSetName -like 'ByThumbprint*' )
-        {
-            $certPath = 'cert:\{0}\{1}\{2}' -f $storeLocationPath,$storeNamePath,$Thumbprint
-            if( (Test-Path -Path $certPath) )
-            {
-                foreach( $certPathItem in (Get-ChildItem -Path $certPath) )
+        @($currentUserLocation, $localMachineLocation) |
+            Where-Object { $_.ToString() -like $locationWildcard } |
+            ForEach-Object {
+                $location = $_
+                Write-Debug -Message "  $($location)"
+
+                if( $CustomStoreName )
                 {
-                    $path = $certPathItem | Resolve-CertificateProviderFriendlyPath
-                    $certPathItem | Add-PathMember -Path $path
+                    try
+                    {
+                        Write-Debug -Message "    $($CustomStoreName)"
+                        [Security.Cryptography.X509Certificates.X509Store]::New($CustomStoreName, $location) |
+                            Write-Output
+                    }
+                    catch
+                    {
+                        $msg = "Failed to open ""$($location)"" ""$($CustomStoreName)"" store: $($_)"
+                        Write-Error -Message $msg -ErrorAction $ErrorActionPreference
+                    }
+                    return
                 }
-            }
-            return
-        }
-        elseif( $PSCmdlet.ParameterSetName -like 'ByFriendlyName*' )
-        {
-            $certPath = Join-Path -Path 'cert:' -ChildPath $storeLocationPath
-            $certPath = Join-Path -Path $certPath -ChildPath $storeNamePath
-            $certPath = Join-Path -Path $certPath -ChildPath '*'
-            return Get-ChildItem -Path $certPath |
-                        Where-Object { $_.FriendlyName -eq $FriendlyName } |
-                        ForEach-Object {
-                            $friendlyPath = $_ | Resolve-CertificateProviderFriendlyPath
-                            $_ | Add-PathMember -Path $friendlyPath
+
+                $storeNameWildcard = '*'
+                if( $StoreName )
+                {
+                    $storeNameWildcard = $StoreName.ToString()
+                }
+                Write-Debug -Message "    $($storeNameWildcard)"
+
+                [Enum]::GetValues([Security.Cryptography.X509Certificates.StoreName]) |
+                    Where-Object { $_.ToString() -like $storeNameWildcard } |
+                    ForEach-Object {
+                        $name = $_
+                        try
+                        {
+                            [Security.Cryptography.X509Certificates.X509Store]::New($name, $location) |
+                                Write-Output
                         }
-        }
-        Write-Error "Unknown parameter set '$($pscmdlet.ParameterSetName)'."
+                        catch
+                        {
+                            $msg = "Exception opening ""$($location)"" ""$($name)"" store: $($_)"
+                            Write-Debug -Message $msg
+                        }
+                    }
+            } |
+            Foreach-Object {
+                $openFlags = [Security.Cryptography.X509Certificates.OpenFlags]::OpenExistingOnly -bor `
+                             [Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly
+
+                [Security.Cryptography.X509Certificates.X509Store] $store = $_
+                try
+                {
+                    $store.Open($openFlags)
+                    $storeNamePropValue = $store.Name
+                    if( -not $CustomStoreName )
+                    {
+                        if( $storeNamePropValue -eq 'CA' )
+                        {
+                            $storeNamePropValue = [Security.Cryptography.X509Certificates.StoreName]::CertificateAuthority
+                        }
+                        else
+                        {
+                            $storeNamePropValue = [Security.Cryptography.X509Certificates.StoreName]$storeNamePropValue
+                        }
+                    }
+                    Write-Debug "      $($store.Location)  $($store.Name)"
+                    $store.Certificates |
+                        Add-Member -MemberType NoteProperty -Name 'StoreLocation' -Value $store.Location -PassThru |
+                        Add-Member -MemberType NoteProperty -Name 'StoreName' -Value $storeNamePropValue -PassThru |
+                        Add-Member -MemberType ScriptProperty -Name 'Path' -Value {
+                            if( -not (Test-Path -Path 'cert:') )
+                            {
+                                return
+                            }
+
+                            $storeNamePath = $this.StoreName
+                            if( $storeNamePath.ToString() -eq 'CertificateAuthority' )
+                            {
+                                $storeNamePath = 'CA'
+                            }
+
+                            $path = Join-Path -Path 'cert:' -ChildPath $this.StoreLocation
+                            $path = Join-Path -Path $path -ChildPath $storeNamePath
+                            $path = Join-Path -Path $path -ChildPath $this.Thumbprint
+                            return $path
+                        } -PassThru
+                }
+                catch
+                {
+                    $msg = "Exception opening and iterating certificates in ""$($store.Location) ""$($store.Name)"" " +
+                           "store: $($_)"
+                    Write-Debug -Message $msg
+                }
+                finally
+                {
+                    $store.Dispose()
+                }
+            } |
+            Where-Object {
+                if( $foundCerts.ContainsKey($_.Thumbprint) )
+                {
+                    return $false
+                }
+                $foundCerts[$_.Thumbprint] = $_
+                return $true
+            } |
+            Where-Object {
+                if( -not $Thumbprint )
+                {
+                    return $true
+                }
+                return $_.Thumbprint -like $Thumbprint
+            } |
+            Where-Object {
+                if( -not $FriendlyName )
+                {
+                    return $true
+                }
+                return $_.FriendlyName -like $FriendlyName
+            } |
+            Where-Object {
+                if( -not $Subject )
+                {
+                    return $true
+                }
+                return $_.Subject -like $Subject
+            } |
+            ForEach-Object { $_.pstypenames.Insert(0, 'Carbon.Cryptography.X509Certificate2') ; $_ } |
+            Write-Output
+        return
     }
+
+    Write-Error "Unknown parameter set '$($pscmdlet.ParameterSetName)'."
 }
 

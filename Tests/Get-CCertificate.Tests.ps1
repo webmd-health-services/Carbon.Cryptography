@@ -8,9 +8,11 @@ $testCertPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCe
 $TestCert = New-Object Security.Cryptography.X509Certificates.X509Certificate2 $testCertPath
 $testCertificateThumbprint = '7D5CE4A8A5EC059B829ED135E9AD8607977691CC'
 $testCertFriendlyName = 'Pup Test Certificate'
+$testCertSubject = 'CN=example.com'
 $testCertCertProviderPath = 'cert:\CurrentUser\My\{0}' -f $testCertificateThumbprint
 
 $onWindows = Test-COperatingSystem -IsWindows
+$onMacOS = Test-COperatingSystem -IsMacOS
 
 function Assert-TestCert
 {
@@ -31,20 +33,72 @@ function Init
     }
 
     $Global:Error.Clear()
+
+    if( -not (Get-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -StoreName My) ) 
+    {
+        # On macOS, the certificate install throws an exception, but the certificate still gets installed. WTF?
+        try
+        {
+            Install-CCertificate -Path $testCertPath -StoreLocation CurrentUser -StoreName My -Verbose
+        }
+        catch
+        {
+            if( -not (Get-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -StoreName My) )
+            {
+                throw
+            }
+        }
+    }
+
+    if( -not $onMacOS -and `
+        -not (Get-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -CustomStoreName 'Carbon') )
+    {
+        Install-CCertificate -Path $testCertPath -StoreLocation CurrentUser -CustomStoreName 'Carbon'
+    }
+}
+
+function ThenReturnedCert
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [Security.Cryptography.X509Certificates.X509Certificate2] $Certificate,
+
+        [String] $WithPath,
+
+        [Security.Cryptography.X509Certificates.StoreLocation] $For,
+
+        [Security.Cryptography.X509Certificates.StoreName] $FromStore,
+
+        [String] $FromCustomStore
+    )
+
     if( $onWindows )
     {
-        if( -not (Get-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -StoreName My) ) 
-        {
-            Write-Debug "testCertPath  $($testCertPath)"
-            Install-CCertificate -Path $testCertPath -StoreLocation CurrentUser -StoreName My
-        }
+        $Certificate.Path | Should -Be $WithPath
+    }
+    else
+    {
+        $Certificate.Path | Should -BeNullOrEmpty
+    }
+
+    $Certificate.StoreLocation | Should -Be $For
+    if( $FromStore )
+    {
+        $Certificate.StoreName | Should -BeOfType [Security.Cryptography.X509Certificates.StoreName]
+        $Certificate.StoreName | Should -Be $FromStore
+    }
+    else
+    {
+        $Certificate.StoreName | Should -BeOfType [String]
+        $Certificate.StoreName | Should -Be $FromCustomStore
     }
 }
 
 Describe 'Get-CCertificate.when getting certificate from a file' {
-    Init
-    $cert = Get-CCertificate -Path $testCertPath
     It ('should have Path property') {
+        Init
+        $cert = Get-CCertificate -Path $testCertPath
         $cert.Path | Should -Be $testCertPath
     }
 }
@@ -52,102 +106,242 @@ Describe 'Get-CCertificate.when getting certificate from a file' {
 if( $onWindows )
 {
     Describe 'Get-CCertificate.when getting certificate by path from certificate store' {
-        Init
-        $cert = Get-CCertificate -Path $testCertCertProviderPath
         It ('should have Path property') {
-            $cert.Path | Should -Be $testCertCertProviderPath
-        }
-    }
-
-    Describe 'Get-CCertificate.when getting certificate by thumbprint' {
-        Init
-        $cert = Get-CCertificate -Thumbprint $testCertificateThumbprint -StoreLocation CurrentUser -StoreName My
-        It ('should have Path property') {
-            $cert.Path | Should -Be $testCertCertProviderPath
-        }
-    }
-
-    Describe 'Get-CCertificate.when getting certificate by friendly name' {
-        Init
-        $cert = Get-CCertificate -FriendlyName $testCertFriendlyName -StoreLocation CurrentUser -StoreName My
-        It ('should have Path property') {
+            Init
+            $cert = Get-CCertificate -Path $testCertCertProviderPath
             $cert.Path | Should -Be $testCertCertProviderPath
         }
     }
 }
 
-Describe 'Get-CCertificate' {
+function Search
+{
+    param(
+        [switch] $ForCurrentUser,
+        [switch] $InMyStore,
+        [switch] $InCustomStore,
+        [switch] $ByThumbprint,
+        [switch] $BySubject,
+        [switch] $ByFriendlyName,
+        [switch] $UsingWildcard
+    )
+
+    $testCase = @{
+        StoreLocation = '';
+        StoreName = '';
+        CustomStoreName = '';
+        Thumbprint = '';
+        Subject = '';
+        FriendlyName = '';
+        ExpectedPath = '';
+        ExpectedStore = 'My'
+    }
+
+    if( $InCustomStore )
+    {
+        $testCase['ExpectedStore'] = 'Carbon'
+    }
+
     if( $onWindows )
     {
-        It 'should find certificates by friendly name' {
-            Init
-            $cert = Get-CCertificate -FriendlyName $TestCert.friendlyName -StoreLocation CurrentUser -StoreName My
-            Assert-TestCert $cert
+        $testCase['ExpectedPath'] = Join-Path -Path 'cert:\CurrentUser' -ChildPath $testCase['ExpectedStore']
+        $testCase['ExpectedPath'] = Join-Path -Path $testCase['ExpectedPath'] -ChildPath $testCertificateThumbprint
+    }
+
+    if( $ForCurrentUser )
+    {
+        $testCase['StoreLocation'] = 'CurrentUser'
+    }
+
+    if( $InMyStore )
+    {
+        $testCase['StoreName'] = 'My'
+    }
+
+    if( $InCustomStore )
+    {
+        $testCase['CustomStoreName'] = 'Carbon'
+    }
+
+    if( $ByThumbprint )
+    {
+        $searchKey = 'Thumbprint'
+        $searchValue = $TestCert.Thumbprint
+    }
+
+    if( $BySubject )
+    {
+        $searchKey = 'Subject'
+        $searchValue = $testCertSubject
+    }
+
+    if( $ByFriendlyName )
+    {
+        $searchKey = 'FriendlyName'
+        $searchValue = $testCertFriendlyName
+    }
+
+    if( $searchValue )
+    {
+        if( $UsingWildcard )
+        {
+            $searchValue = $searchValue.Substring(0, $searchValue.Length -1)
+            $searchValue = "$($searchValue)*"
         }
 
-        It 'should find certificate by thumbprint' {
-            Init
-            $cert = Get-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -StoreName My
-            Assert-TestCert $cert
+        $testCase[$searchKey] = $searchValue
+    }
+
+    return $testCase
+}
+
+$searchTestCases = & {
+    # Search in all stores.
+    Search -ByThumbprint
+    Search -ByThumbprint -UsingWildcard
+    Search -BySubject
+    Search -BySubject -UsingWildcard
+    Search -ByFriendlyName
+    Search -ByFriendlyName -UsingWildcard
+
+    # Search all stores for single location.
+    Search -ForCurrentUser -ByThumbprint
+    Search -ForCurrentUser -ByThumbprint -UsingWildcard
+    Search -ForCurrentUser -BySubject
+    Search -ForCurrentUser -BySubject -UsingWildcard
+    Search -ForCurrentUser -ByFriendlyName
+    Search -ForCurrentUser -ByFriendlyName -UsingWildcard
+
+    # Search single store in all locations.
+    Search -InMyStore -ByThumbprint
+    Search -InMyStore -ByThumbprint -UsingWildcard
+    Search -InMyStore -BySubject
+    Search -InMyStore -BySubject -UsingWildcard
+    Search -InMyStore -ByFriendlyName
+    Search -InMyStore -ByFriendlyName -UsingWildcard
+
+    # Search a single store for a single location.
+    Search -ForCurrentUser -InMyStore -ByThumbprint
+    Search -ForCurrentUser -InMyStore -ByThumbprint -UsingWildcard
+    Search -ForCurrentUser -InMyStore -BySubject
+    Search -ForCurrentUser -InMyStore -BySubject -UsingWildcard
+    Search -ForCurrentUser -InMyStore -ByFriendlyName
+    Search -ForCurrentUser -InMyStore -ByFriendlyName -UsingWildcard
+
+    # Search a custom store in all locations.
+    Search -InCustomStore -ByThumbprint
+    Search -InCustomStore -ByThumbprint -UsingWildcard
+    Search -InCustomStore -BySubject
+    Search -InCustomStore -BySubject -UsingWildcard
+    Search -InCustomStore -ByFriendlyName
+    Search -InCustomStore -ByFriendlyName -UsingWildcard
+
+    # Search a custom store for a single location.
+    Search -ForCurrentUser -InCustomStore -ByThumbprint
+    Search -ForCurrentUser -InCustomStore -ByThumbprint -UsingWildcard
+    Search -ForCurrentUser -InCustomStore -BySubject
+    Search -ForCurrentUser -InCustomStore -BySubject -UsingWildcard
+    Search -ForCurrentUser -InCustomStore -ByFriendlyName
+    Search -ForCurrentUser -InCustomStore -ByFriendlyName -UsingWildcard
+}
+
+function ConvertTo-Parameter
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory, ValueFromPipeline)]
+        [hashtable] $InputObject
+    )
+
+    process
+    {
+        $params = @{}
+        foreach( $key in $InputObject.Keys )
+        {
+            if( $key -like 'Expected*' )
+            {
+                continue
+            }
+
+            $value = $InputObject[$key]
+            if( -not $value )
+            {
+                continue
+            }
+
+            $params[$key] = $value
         }
-    
-        It 'should not throw error when certificate does not exist' {
-            Init
-            $cert = Get-CCertificate -Thumbprint '1234567890abcdef1234567890abcdef12345678' -StoreLocation CurrentUser -StoreName My -ErrorAction SilentlyContinue
-            $Global:Error.Count | Should -Be 0
+
+        return ,$params
+    }
+}
+
+$itMsg = 'in { Location = <StoreLocation>; Store = <StoreName>; CustomStoreName = <CustomStoreName> } by { Thumbprint = ' +
+         '<Thumbprint> ; Subject = <Subject> ; FriendlyName = <FriendlyName> }'
+Describe 'Get-CCertificate.when searching for a certificate' {
+    It $itMsg -TestCases $searchTestCases {
+        param(
+            $StoreLocation,
+            $StoreName,
+            $CustomStoreName,
+            $Thumbprint,
+            $Subject,
+            $FriendlyName,
+            $ExpectedPath,
+            $ExpectedStore
+        )
+        
+        Init
+        $params = ,$PSBoundParameters | ConvertTo-Parameter
+        $cert = Get-CCertificate @params
+
+        # Friendly names are Windows-only.
+        if( (-not $onWindows -and $FriendlyName) -or ($onMacOS -and $CustomStoreName) )
+        {
             $cert | Should -BeNullOrEmpty
-        }
-        
-        It 'should find certificate in custom store by thumbprint' {
-            Init
-            $expectedCert =
-                Install-CCertificate -Path $testCertPath -StoreLocation CurrentUser -CustomStoreName 'Carbon' -PassThru
-            try
-            {
-                $cert = Get-CCertificate -Thumbprint $expectedCert.Thumbprint -StoreLocation CurrentUser -CustomStoreName 'Carbon'
-                $cert | Should -Not -BeNullOrEmpty
-                $cert.Thumbprint | Should -Be $expectedCert.Thumbprint
-            }
-            finally
-            {
-                Uninstall-CCertificate -Certificate $expectedCert -StoreLocation CurrentUser -CustomStoreName 'Carbon'
-            }
-        }
-        
-        It 'should find certificate in custom store by friendly name' {
-            Init
-            $expectedCert =
-                Install-CCertificate -Path $testCertPath -StoreLocation CurrentUser -CustomStoreName 'Carbon' -PassThru
-            try
-            {
-                $cert = Get-CCertificate -FriendlyName $expectedCert.FriendlyName -StoreLocation CurrentUser -CustomStoreName 'Carbon'
-                $cert | Should -Not -BeNullOrEmpty
-                $cert.Thumbprint | Should -Be $expectedCert.Thumbprint
-            }
-            finally
-            {
-                Uninstall-CCertificate -Certificate $expectedCert -StoreLocation CurrentUser -CustomStoreName 'Carbon'
-            }
+            return
         }
 
+        $storeParam = @{ 'FromStore' = $ExpectedStore }
+        if( $CustomStoreName )
+        {
+            $storeParam = @{ 'FromCustomStore' = $ExpectedStore }
+        }
+        ThenReturnedCert $cert -WithPath $ExpectedPath -For 'CurrentUser' @storeParam
+    }
+}
+
+Describe 'Get-CCertificate.when certificate does not exist' {
+    It 'should not throw error when certificate does not exist' {
+        Init
+        $cert = Get-CCertificate -Thumbprint '1234567890abcdef1234567890abcdef12345678' -StoreLocation CurrentUser -StoreName My -ErrorAction SilentlyContinue
+        $Global:Error.Count | Should -Be 0
+        $cert | Should -BeNullOrEmpty
+    }
+}
+
+if( (Test-Path -Path 'Cert:\CurrentUser\CA') )
+{
+    Describe 'Get-CCertificate.when searching with CertificateAuthority store name' {
         It 'should get certificates in CA store' {
             Init
             $foundACert = $false
-            dir Cert:\CurrentUser\CA | ForEach-Object {
-                $cert = Get-CCertificate -Thumbprint $_.Thumbprint -StoreLocation CurrentUser -StoreName CertificateAuthority
-                $cert | Should -Not -BeNullOrEmpty
+            foreach( $expectedCert in (Get-ChildItem -Path 'Cert:\CurrentUser\CA') )
+            {
+                $actualCert = Get-CCertificate -Thumbprint $expectedCert.Thumbprint `
+                                               -StoreLocation CurrentUser `
+                                               -StoreName CertificateAuthority
+                $actualCert | Should -Not -BeNullOrEmpty
+                $actualCert.Thumbprint | Should -Be $expectedCert.Thumbprint
                 $foundACert = $true
             }
-        }    
+            $foundACert | Should -BeTrue
+        }
     }
-    
-    It 'should find certificate by path' {
-        Init
-        $cert = Get-CCertificate -Path $testCertPath
-        Assert-TestCert $cert
-    }
-    
-    It 'should find certificate by relative path' {
+}
+
+Describe 'Get-CCertificate.when getting certificate with relative path' {
+    It 'should get certificate' {
         Init
         Push-Location -Path $PSScriptRoot
         try
@@ -160,8 +354,10 @@ Describe 'Get-CCertificate' {
             Pop-Location
         }
     }
-    
-    It 'should get password protected certificate' {
+}
+
+Describe 'Get-CCertificate.when certificate file is password protected' {
+    It 'should get certificate' {
         Init
         $certPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificateWithPassword.pfx' -Resolve
         [Security.Cryptography.X509Certificates.X509Certificate2]$cert = 
@@ -174,8 +370,10 @@ Describe 'Get-CCertificate' {
             $cert.FriendlyName | Should -Be 'Carbon Test Certificate - Password Protected'
         }
     }
-    
-    It 'should include exception when failing to load certificate' {
+}
+
+Describe 'Get-CCertificate.when certificate fails to load' {
+    It 'should include exception in error message' {
         Init
         $cert = Get-CCertificate -Path (Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificateWithPassword.pfx') -ErrorAction SilentlyContinue
         $Global:Error.Count | Should -BeGreaterThan 0
@@ -198,4 +396,5 @@ Describe 'Get-CCertificate.when not using parameter name' {
 if( $onWindows )
 {
     Uninstall-CCertificate -Certificate $TestCert -storeLocation CurrentUser -StoreName My
+    Uninstall-CCertificate -Certificate $TestCert -storeLocation CurrentUser -CustomStoreName 'Carbon'
 }

@@ -17,7 +17,7 @@
     RootModule = 'Carbon.Cryptography.psm1'
 
     # Version number of this module.
-    ModuleVersion = '1.0.4'
+    ModuleVersion = '1.1.0'
 
     # ID used to uniquely identify this module
     GUID = '225b9f63-3e3e-406c-87a0-33d34f30cd8e'
@@ -68,7 +68,9 @@
     # TypesToProcess = @()
 
     # Format files (.ps1xml) to be loaded when importing this module
-    # FormatsToProcess = @( )
+    FormatsToProcess = @(
+        'Formats\Carbon.Cryptography.X509Certificate2.ps1xml'
+    )
 
     # Modules to import as nested modules of the module specified in RootModule/ModuleToProcess
     # NestedModules = @()
@@ -77,7 +79,9 @@
     FunctionsToExport = @(
         'Convert-CSecureStringToByte',
         'Convert-CSecureStringToString',
+        'Find-CTlsCertificate',
         'Get-CCertificate',
+        'Get-LocalCertificate',
         'Install-CCertificate',
         'Protect-CString',
         'Uninstall-CCertificate',
@@ -115,7 +119,7 @@
 
             # Tags applied to this module. These help with module discovery in online galleries.
             Tags = @( 
-                'Desktop', 'Core', 'Caron', 'security', 'convert', 'securestring', 'string', 'certificate',
+                'Desktop', 'Core', 'Carbon', 'security', 'convert', 'securestring', 'string', 'certificate',
                 'certificates', 'x509', 'x509certificate', 'x509certificates', 'install', 'uninstall', 'encrypt',
                 'decrypt', 'aes', 'rsa', 'protect', 'unprotect', 'crypto', 'cryptography', 'dpapi', 'key', 'public-key',
                 'private-key', 'asymmetric', 'symmetric'
@@ -133,10 +137,7 @@
             Prerelease = ''
 
             # ReleaseNotes of this module
-            ReleaseNotes = @'
-* Fixed: Unprotect-CString sometimes fails to decrypt a secret if the decryption key certificate is installed in
-  multiple certificate stores but some of those times without the private key.
-'@
+            ReleaseNotes = 'https://github.com/webmd-health-services/Carbon.Cryptography/blob/main/CHANGELOG.md'
         } # End of PSData hashtable
 
     } # End of PrivateData hashtable
