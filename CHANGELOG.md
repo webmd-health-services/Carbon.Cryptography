@@ -7,14 +7,18 @@
 commands. If you're using the `Import-Module` cmdlet's `-Function` parameter when importing `Carbon.Cryptography`,
 remove the `C` prefix from the function names.
 
-Replace any usages of `Get-LocalCertificate` with `Get-CCertificate`. `Get-LocalCertificate` was a private function that
-was accidentally made public.
+The `Get-LocalCertificate` function was removed. Replace any usages of `Get-LocalCertificate` with `Get-CCertificate`. 
+
+The `Remove-Certificate` alias was removed. Replace usages of the `Remove-Certificate` alias with 
+`Uninstall-CCertificatte`.
 
 ## Changes
 
 * `Carbon.Cryptography` now uses the `DefaultCommandPrefix` module manifest metadata to add the `C` prefix to its
   commands.
 * Removed `Get-LocalCertificate` function (it was an internal function that was accidentally exported from the module).
+* Removed `Remove-Certificate` alias to `Uninstall-CCertificate`.
+
 
 # 1.1.0
 

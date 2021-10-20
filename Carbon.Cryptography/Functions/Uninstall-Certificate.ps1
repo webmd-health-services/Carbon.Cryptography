@@ -223,6 +223,3 @@ function Uninstall-Certificate
         } -ArgumentList $Thumbprint,$StoreLocation,$StoreName,$CustomStoreName
     }
 }
-
-Set-Alias -Name 'Remove-Certificate' -Value 'Uninstall-CCertificate'
-
