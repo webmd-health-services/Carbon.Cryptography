@@ -339,11 +339,12 @@ function Get-Certificate
                 }
             } |
             Where-Object {
-                if( $foundCerts.ContainsKey($_.Thumbprint) )
+                $key = "$($_.StoreLocation)\$($_.StoreName)\$($_.Thumbprint)"
+                if( $foundCerts.ContainsKey($key) )
                 {
                     return $false
                 }
-                $foundCerts[$_.Thumbprint] = $_
+                $foundCerts[$key] = $_
                 return $true
             } |
             Where-Object {

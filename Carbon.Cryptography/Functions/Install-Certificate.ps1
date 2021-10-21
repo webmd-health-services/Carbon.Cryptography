@@ -45,54 +45,54 @@ function Install-Certificate
     [CmdletBinding(SupportsShouldProcess, DefaultParameterSetName='FromFileInWindowsStore')]
     [OutputType([Security.Cryptography.X509Certificates.X509Certificate2])]
     param(
+        # The path to the certificate file.
         [Parameter(Mandatory, Position=0, ParameterSetName='FromFileInWindowsStore')]
         [Parameter(Mandatory, Position=0, ParameterSetName='FromFileInCustomStore')]
-        # The path to the certificate file.
-        [String]$Path,
+        [String] $Path,
         
+        # The certificate to install.
         [Parameter(Mandatory, Position=0, ParameterSetName='FromCertificateInWindowsStore')]
         [Parameter(Mandatory, Position=0, ParameterSetName='FromCertificateInCustomStore')]
-        # The certificate to install.
-        [Security.Cryptography.X509Certificates.X509Certificate2]$Certificate,
+        [Security.Cryptography.X509Certificates.X509Certificate2] $Certificate,
         
-        [Parameter(Mandatory)]
         # The location of the certificate's store.  To see a list of acceptable values, run:
         #
         #   > [Enum]::GetValues([Security.Cryptography.X509Certificates.StoreLocation])
-        [Security.Cryptography.X509Certificates.StoreLocation]$StoreLocation,
+        [Parameter(Mandatory)]
+        [Security.Cryptography.X509Certificates.StoreLocation] $StoreLocation,
         
-        [Parameter(Mandatory, ParameterSetName='FromFileInWindowsStore')]
-        [Parameter(Mandatory, ParameterSetName='FromCertificateInWindowsStore')]
         # The name of the certificate's store.  To see a list of acceptable values run:
         #
         #  > [Enum]::GetValues([Security.Cryptography.X509Certificates.StoreName])
-        [Security.Cryptography.X509Certificates.StoreName]$StoreName,
+        [Parameter(Mandatory, ParameterSetName='FromFileInWindowsStore')]
+        [Parameter(Mandatory, ParameterSetName='FromCertificateInWindowsStore')]
+        [Security.Cryptography.X509Certificates.StoreName] $StoreName,
 
+        # The name of the non-standard, custom store where the certificate should be installed.
         [Parameter(Mandatory, ParameterSetName='FromFileInCustomStore')]
         [Parameter(Mandatory, ParameterSetName='FromCertificateInCustomStore')]
-        # The name of the non-standard, custom store where the certificate should be installed.
-        [String]$CustomStoreName,
+        [String] $CustomStoreName,
 
-        [Parameter(ParameterSetName='FromFileInWindowsStore')]
-        [Parameter(ParameterSetName='FromFileInCustomStore')]
         # Mark the private key as exportable. Only valid if loading the certificate from a file.
-        [switch]$Exportable,
-        
         [Parameter(ParameterSetName='FromFileInWindowsStore')]
         [Parameter(ParameterSetName='FromFileInCustomStore')]
+        [switch] $Exportable,
+        
         # The password for the certificate.  Should be a `System.Security.SecureString`.
-        [securestring]$Password,
+        [Parameter(ParameterSetName='FromFileInWindowsStore')]
+        [Parameter(ParameterSetName='FromFileInCustomStore')]
+        [securestring] $Password,
 
         # Use the `Session` parameter to install a certificate on remote computer(s) using PowerShell remoting. Use
         # `New-PSSession` to create a session.
-        [Management.Automation.Runspaces.PSSession[]]$Session,
+        [Management.Automation.Runspaces.PSSession[]] $Session,
 
         # Re-install the certificate, even if it is already installed. Calls the `Add()` method for store even if the
         # certificate is in the store. This function assumes that the `Add()` method replaces existing certificates.
-        [switch]$Force,
+        [switch] $Force,
 
         # Return the installed certificate.
-        [switch]$PassThru
+        [switch] $PassThru
     )
     
     Set-StrictMode -Version 'Latest'
@@ -152,29 +152,29 @@ function Install-Certificate
     Invoke-Command @invokeCommandArgs -ScriptBlock {
         [CmdletBinding()]
         param(
-            [Parameter(Mandatory)]
             # The base64 encoded certificate to install.
-            [String]$EncodedCertificate,
+            [Parameter(Mandatory)]
+            [String] $EncodedCertificate,
 
             # The password for the certificate.
-            [securestring]$Password,
+            [securestring] $Password,
 
             [Parameter(Mandatory)]
-            [Security.Cryptography.X509Certificates.StoreLocation]$StoreLocation,
+            [Security.Cryptography.X509Certificates.StoreLocation] $StoreLocation,
         
             $StoreName,
 
-            [string]$CustomStoreName,
+            [string] $CustomStoreName,
 
-            [Security.Cryptography.X509Certificates.X509KeyStorageFlags]$KeyStorageFlags,
+            [Security.Cryptography.X509Certificates.X509KeyStorageFlags] $KeyStorageFlags,
 
-            [bool]$Force,
+            [bool] $Force,
 
-            [bool]$WhatIf,
+            [bool] $WhatIf,
 
-            [Management.Automation.ActionPreference]$Verbosity,
+            [Management.Automation.ActionPreference] $Verbosity,
             
-            [String]$Thumbprint
+            [String] $Thumbprint
         )
 
         Set-StrictMode -Version 'Latest'
@@ -188,11 +188,13 @@ function Install-Certificate
         {
             if( $CustomStoreName )
             {
+                $storeNameDisplay = $CustomStoreName
                 $store = [Security.Cryptography.X509Certificates.X509Store]::New($CustomStoreName, $StoreLocation)
             }
             else
             {
                 $StoreName = [Security.Cryptography.X509Certificates.StoreName]$StoreName
+                $storeNameDisplay = $StoreName.ToString()
                 $store = [Security.Cryptography.X509Certificates.X509Store]::New($StoreName, $StoreLocation)
             }
 
@@ -226,12 +228,12 @@ function Install-Certificate
                 $description = $cert.Subject
             }
 
-            $action = "install into $($StoreLocation)'s $($StoreName) store"
+            $action = "install into $($StoreLocation)\$($storeNameDisplay) store"
             $target = "$($description) ($($cert.Thumbprint))"
-            if( $PSCmdlet.ShouldProcess($action, $target) )
+            if( $PSCmdlet.ShouldProcess($target, $action) )
             {
-                $msg = "Installing certificate ""$($description)"" ($($cert.Thumbprint)) into $($StoreLocation)'s " +
-                       "$($StoreName) store."
+                $msg = "Installing certificate ""$($description)"" ($($cert.Thumbprint)) into $($StoreLocation)\" +
+                       "$($storeNameDisplay) store."
                 Write-Verbose -Message $msg 
                 $store.Add( $cert )
             }
