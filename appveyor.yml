@@ -12,7 +12,12 @@ image:
 - Visual Studio 2017
 - Visual Studio 2019
 - Ubuntu
+- Ubuntu2004
+- Ubuntu1804
+- Ubuntu1604
 - macOS
+- macOS-BigSur
+- macOS-Mojave
 
 build:
   verbosity: minimal
