@@ -11,8 +11,10 @@ $isAdmin = Test-IsAdministrator
 $localMachineLocationAvailable = (Test-TCOperatingSystem -Windows) -and $isAdmin
 $isCustomStoreAvailable = -not (Test-TCOperatingSystem -Windows) -or $isAdmin
 $isRemotingAvailable = -not (Test-RunningUnderBuildServer) -and $isAdmin
+# macOS requires all certificates with private keys to be marked exportable.
+$mustBeExportable = (Test-TCOperatingSystem -MacOS)
 
-if( $isRemotingAvailable )
+if( $isRemotingAvailable -and (Get-Command -Name 'Get-Service' -ErrorAction Ignore) )
 {
     Start-Service 'WinRM'
 }
@@ -21,7 +23,7 @@ function Init
 {
     # Make sure there's no local machine cert "inheriting" down to the current user's store.
     Uninstall-CCertificate -Thumbprint $TestCert.Thumbprint
-    Install-CCertificate -Path $TestCertPath -StoreLocation CurrentUser -StoreName My
+    Install-CCertificate -Path $TestCertPath -StoreLocation CurrentUser -StoreName My -Exportable:$mustBeExportable
 }
 
 Describe 'Uninstall-Certificate' {

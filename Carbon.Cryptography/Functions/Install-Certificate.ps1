@@ -98,6 +98,9 @@ function Install-Certificate
     Set-StrictMode -Version 'Latest'
     Use-CallerPreference -Cmdlet $PSCmdlet -Session $ExecutionContext.SessionState
 
+    $ephemeralKeyFlag = [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
+    $defaultKeyFlag = [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::DefaultKeySet
+
     if( $PSCmdlet.ParameterSetName -like 'FromFile*' )
     {   
         $resolvedPath = Resolve-Path -Path $Path
@@ -110,23 +113,27 @@ function Install-Certificate
         
         $fileBytes = [IO.File]::ReadAllBytes($Path)
         $encodedCert = [Convert]::ToBase64String($fileBytes)
-
-        # Make sure loading the certificate doesn't leave temporary cruft around on the file system. We're only loading
-        # the cert to get its thumbprint.
-        $keyStorageFlags = @{}
-        if( $StoreLocation -eq [Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser )
+        $keyFlags = $ephemeralKeyFlag
+        if( (Test-TCOperatingSystem -MacOS) )
         {
-            # macOS doesn't support ephemeral key sets.
-            if( -not (Test-COperatingSystem -MacOS) )
-            {
-                $keyStorageFlags['KeyStorageFlags'] =
-                    [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
-            }
+            $keyFlags = $defaultKeyFlag
         }
-        $Certificate = Get-Certificate -Path $Path -Password $Password @keyStorageFlags
+
+        # We need the certificate thumbprint so we can check if the certificate exists or not.
+        $Certificate = [Security.Cryptography.X509Certificates.X509Certificate]::New($Path, $Password, $keyFlags)
+        try
+        {
+            $thumbprint = $Certificate.Thumbprint
+        }
+        finally
+        {
+            $Certificate.Reset()
+        }
+        $Certificate = $null
     }
     else
     {
+        $thumbprint = $Certificate.Thumbprint
         $encodedCert = [Convert]::ToBase64String( $Certificate.RawData )
     }
 
@@ -184,6 +191,8 @@ function Install-Certificate
 
         $certFilePath = Join-Path -Path ([IO.Path]::GetTempPath()) -ChildPath ([IO.Path]::GetRandomFileName())
 
+        [Security.Cryptography.X509Certificates.X509Certificate2] $cert = $null
+        [Security.Cryptography.X509Certificates.X509Store] $store = $null
         try
         {
             if( $CustomStoreName )
@@ -217,10 +226,15 @@ function Install-Certificate
             $certBytes = [Convert]::FromBase64String( $EncodedCertificate )
             [IO.File]::WriteAllBytes( $certFilePath, $certBytes )
 
+            # Make sure the key isn't persisted if we're not going to store it. 
+            if( $WhatIf )
+            {
+                # We don't use EphemeralKeySet because it isn't supported on macOS.
+                $KeyStorageFlags = [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::DefaultKeySet
+            }
+
             $cert = 
                 [Security.Cryptography.X509Certificates.X509Certificate2]::New($certFilePath, $Password, $KeyStorageFlags)
-
-            $store.Open( ([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite) )
 
             $description = $cert.FriendlyName
             if( -not $description )
@@ -228,27 +242,66 @@ function Install-Certificate
                 $description = $cert.Subject
             }
 
+            $store.Open( ([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite) )
+
             $action = "install into $($StoreLocation)\$($storeNameDisplay) store"
             $target = "$($description) ($($cert.Thumbprint))"
             if( $PSCmdlet.ShouldProcess($target, $action) )
             {
                 $msg = "Installing certificate ""$($description)"" ($($cert.Thumbprint)) into $($StoreLocation)\" +
-                       "$($storeNameDisplay) store."
+                    "$($storeNameDisplay) store."
                 Write-Verbose -Message $msg 
                 $store.Add( $cert )
             }
-            $store.Close()
+        }
+        catch
+        {
+            if( (Test-TCOperatingSystem -MacOS) -and ($cert.HasPrivateKey -and -not $Exportable) )
+            {
+                $msg = "Exception importing certificate ""$($description)"" ($($cert.Thumbprint)) into " +
+                       "$($StoreLocation)\$($storeNameDisplay): $($_). On macOS, certificates with private keys " +
+                       "must be exportable. Update $($MyInvocation.MyCommand.Name) with the ""-Exportable"" switch."
+                Write-Error -Message $msg -ErrorAction $ErrorActionPreference
+                return
+            }
+            throw
         }
         finally
         {
             Remove-Item -Path $certFilePath -ErrorAction Ignore -WhatIf:$false -Force
-        }
 
-    } -ArgumentList $encodedCert,$Password,$StoreLocation,$StoreName,$CustomStoreName,$keyFlags,$Force,$WhatIfPreference,$VerbosePreference, $Certificate.Thumbprint
+            if( $cert )
+            {
+                $cert.Reset()
+            }
+
+            if( $store )
+            {
+                $store.Close()
+            }
+        }
+    } -ArgumentList $encodedCert,
+                    $Password,
+                    $StoreLocation,
+                    $StoreName,
+                    $CustomStoreName,
+                    $keyFlags,
+                    $Force,
+                    $WhatIfPreference,
+                    $VerbosePreference,
+                    $thumbprint
 
     if( $PassThru )
     {
-        return $Certificate
+        # Don't return a certificate object created by this function. It may have been loaded from a file and stored
+        # in a temp file on disk. If that certificate object isn't properly disposed, the temp file can stick around
+        # slowly filling up disks.
+        $storeParam = @{ StoreName = $StoreName }
+        if( $CustomStoreName )
+        {
+            $storeParam = @{ CustomStoreName = $CustomStoreName }
+        }
+        return Get-CCertificate -Thumbprint $thumbprint -StoreLocation $StoreLocation @storeParam
     }
 }
 

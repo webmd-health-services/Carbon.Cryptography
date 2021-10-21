@@ -4,11 +4,12 @@ Set-StrictMode -Version 'Latest'
 
 & (Join-Path -Path $PSScriptRoot -ChildPath 'Initialize-Test.ps1' -Resolve)
 
-$testCertPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificate.pfx' -Resolve
-$testCert = New-Object 'Security.Cryptography.X509Certificates.X509Certificate2' $testCertPath
+$resourcesPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources' -Resolve
+$testCertPath = Join-Path -Path $resourcesPath -ChildPath 'CarbonTestCertificate.pfx' -Resolve
+$testCert = [Security.Cryptography.X509Certificates.X509Certificate2]::New($testCertPath)
 $password = ConvertTo-SecureString -String 'password' -AsPlainText -Force
-$TestCertProtectedPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificateWithPassword.pfx' -Resolve
-$testCertProtected = New-Object 'Security.Cryptography.X509Certificates.X509Certificate2' $TestCertProtectedPath, $password
+$TestCertProtectedPath = Join-Path -Path $resourcesPath -ChildPath 'CarbonTestCertificateWithPassword.pfx' -Resolve
+$testCertProtected = [Security.Cryptography.X509Certificates.X509Certificate2]::New($TestCertProtectedPath, $password)
 
 # $isAdmin = Test-IsAdministrator
 # $localMachineLocationAvailable = -not $onWindows -or $isAdmin
@@ -21,8 +22,10 @@ $isCustomStoreAvailable = -not (Test-TCOperatingSystem -Windows) -or $isAdmin
 $isRemotingAvailable = -not (Test-RunningUnderBuildServer) -and $isAdmin
 $physicalStorePathKnown = $onWindows
 $canExportPrivateKeyByDefault = Test-TCOperatingSystem -Linux
+# macOS requires all certificates with private keys to be marked exportable.
+$mustBeExportable = (Test-TCOperatingSystem -MacOS)
 
-if( $isRemotingAvailable )
+if( $isRemotingAvailable -and (Get-Command -Name 'Get-Service' -ErrorAction Ignore) )
 {
     Start-Service 'WinRM'
 }
@@ -240,13 +243,13 @@ Describe 'Install-Certificate' {
 
         Context "for $($location)" {
             It 'should install certificate from a file' -Skip:$skip {
-                WhenInstalling -FromFile $testCertPath -For $location -In 'My'
+                WhenInstalling -FromFile $testCertPath -For $location -In 'My' -ThatIsExportable:$mustBeExportable
                 ThenCertificateInstalled $testCert.Thumbprint -For $location -In 'My' 
                 ThenNothingReturned
                 $cert = Get-CCertificate -Thumbprint $testCert.Thumbprint -StoreLocation $location -StoreName 'My'
                 {
                     $cert.Export( [Security.Cryptography.X509Certificates.X509ContentType]::Pfx ) | Out-Null
-                } | Should -Not:($canExportPrivateKeyByDefault) -Throw
+                } | Should -Not:($canExportPrivateKeyByDefault -or $mustBeExportable) -Throw
             }
 
             It 'should install certificate from a file with relative path' -Skip:$skip {
@@ -254,7 +257,7 @@ Describe 'Install-Certificate' {
                 try
                 {
                     $path = '.\Resources\{0}' -f (Split-Path -Leaf -Path $testCertPath)
-                    WhenInstalling -FromFile $path -For $location -In 'My'
+                    WhenInstalling -FromFile $path -For $location -In 'My' -ThatIsExportable:$mustBeExportable
                     ThenNothingReturned
                     ThenCertificateInstalled $testCert.Thumbprint -For $location -In 'My' 
                 }
@@ -282,7 +285,11 @@ Describe 'Install-Certificate' {
 
             It 'should install password protected certificate' -Skip:$skip {
                 $fileCount = Measure-PhysicalStore -Location $location
-                WhenInstalling -FromFile $TestCertProtectedPath -WithPassword $password -For $location -In 'My'
+                WhenInstalling -FromFile $TestCertProtectedPath `
+                               -WithPassword $password `
+                               -For $location `
+                               -In 'My' `
+                               -ThatIsExportable:$mustBeExportable
                 ThenNothingReturned
                 ThenCertificateInstalled $testCertProtected.Thumbprint -For $location -In 'My'
                 ThenPhysicalStoreHasCount ($fileCount + 1) -ForLocation $location
@@ -329,7 +336,7 @@ foreach( $location in $locations )
             Init
             Uninstall-CCertificate -Thumbprint $testCert.Thumbprint
             Get-CCertificate -Thumbprint $testCert.Thumbprint | Should -BeNullOrEmpty
-            WhenInstalling -FromFile $testCertPath -For $location -In 'Carbon'
+            WhenInstalling -FromFile $testCertPath -For $location -In 'Carbon' -ThatIsExportable:$mustBeExportable
             ThenNothingReturned
 
             $duration = [Diagnostics.Stopwatch]::StartNew()
@@ -364,7 +371,12 @@ foreach( $location in $locations )
             $fileCount = Measure-PhysicalStore -Location $location
             Init
             $output =
-                WhenInstalling -FromFile $testCertPath -For $location -In 'My' -Verbose 4>&1 |
+                WhenInstalling -FromFile $testCertPath `
+                               -For $location `
+                               -In 'My' `
+                               -ThatIsExportable:$mustBeExportable `
+                               -Verbose `
+                               4>&1 |
                 Where-Object { $_ -is [Management.Automation.VerboseRecord] }
             $output | Should -HaveCount 1
             $output.Message | Should -Match 'Installing certificate'
@@ -388,7 +400,12 @@ foreach( $location in $locations )
             $fileCount = Measure-PhysicalStore -Location $location
             Init
             $output =
-                WhenInstalling -FromFile $testCertPath -For $location -In 'My' -Verbose 4>&1 |
+                WhenInstalling -FromFile $testCertPath `
+                               -For $location `
+                               -In 'My' `
+                               -ThatIsExportable:$mustBeExportable `
+                               -Verbose `
+                               4>&1 |
                 Where-Object { $_ -is [Management.Automation.VerboseRecord] }
             ThenNoError
             $output | Should -HaveCount 1

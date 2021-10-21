@@ -29,6 +29,11 @@ function Test-IsAdministrator
         return $currentIdentity.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     }
 
+    if( (Get-Command -Name 'id' -ErrorAction Ignore) )
+    {
+        return (id -u) -eq 0
+    }
+    
     # Don't know how to do this check on other platforms or even if it makes sense?
     return $false
 }

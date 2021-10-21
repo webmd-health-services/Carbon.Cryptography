@@ -10,9 +10,11 @@ $testCertificateThumbprint = '7D5CE4A8A5EC059B829ED135E9AD8607977691CC'
 $testCertFriendlyName = 'Pup Test Certificate'
 $testCertSubject = 'CN=example.com'
 $testCertCertProviderPath = 'cert:\CurrentUser\My\{0}' -f $testCertificateThumbprint
+# macOS requires all certificates with private keys to be marked exportable.
+$mustBeExportable = (Test-TCOperatingSystem -MacOS)
+$supportsCustomStores = -not (Test-TCOperatingSystem -MacOS)
 
-$onWindows = Test-TCOperatingSystem -IsWindows
-$onMacOS = Test-TCOperatingSystem -IsMacOS
+$supportsFriendlyName = Test-TCOperatingSystem -IsWindows
 
 function Assert-TestCert
 {
@@ -36,24 +38,21 @@ function Init
 
     if( -not (Get-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -StoreName My) ) 
     {
-        # On macOS, the certificate install throws an exception, but the certificate still gets installed. WTF?
-        try
-        {
-            Install-CCertificate -Path $testCertPath -StoreLocation CurrentUser -StoreName My -Verbose
-        }
-        catch
-        {
-            if( -not (Get-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -StoreName My) )
-            {
-                throw
-            }
-        }
+        Install-CCertificate -Path $testCertPath `
+                             -StoreLocation CurrentUser `
+                             -StoreName My `
+                             -Exportable:$mustBeExportable `
+                             -Verbose
     }
 
-    if( -not $onMacOS -and `
+
+    if( $supportsCustomStores -and `
         -not (Get-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -CustomStoreName 'Carbon') )
     {
-        Install-CCertificate -Path $testCertPath -StoreLocation CurrentUser -CustomStoreName 'Carbon'
+        Install-CCertificate -Path $testCertPath `
+                             -StoreLocation CurrentUser `
+                             -CustomStoreName 'Carbon' `
+                             -Exportable:$mustBeExportable
     }
 }
 
@@ -73,7 +72,7 @@ function ThenReturnedCert
         [String] $FromCustomStore
     )
 
-    if( $onWindows )
+    if( (Test-Path -Path 'cert:') )
     {
         $Certificate.Path | Should -Be $WithPath
     }
@@ -103,14 +102,11 @@ Describe 'Get-Certificate.when getting certificate from a file' {
     }
 }
 
-if( $onWindows )
-{
-    Describe 'Get-Certificate.when getting certificate by path from certificate store' {
-        It ('should have Path property') {
-            Init
-            $cert = Get-CCertificate -Path $testCertCertProviderPath
-            $cert.Path | Should -Be $testCertCertProviderPath
-        }
+Describe 'Get-Certificate.when getting certificate by path from certificate store' {
+    It ('should have Path property') -Skip:(-not (Test-Path -Path 'cert:')) {
+        Init
+        $cert = Get-CCertificate -Path $testCertCertProviderPath
+        $cert.Path | Should -Be $testCertCertProviderPath
     }
 }
 
@@ -142,7 +138,7 @@ function Search
         $testCase['ExpectedStore'] = 'Carbon'
     }
 
-    if( $onWindows )
+    if( (Test-Path -Path 'cert:') )
     {
         $testCase['ExpectedPath'] = Join-Path -Path 'cert:\CurrentUser' -ChildPath $testCase['ExpectedStore']
         $testCase['ExpectedPath'] = Join-Path -Path $testCase['ExpectedPath'] -ChildPath $testCertificateThumbprint
@@ -296,7 +292,7 @@ Describe 'Get-Certificate.when searching for a certificate' {
         $cert = Get-CCertificate @params
 
         # Friendly names are Windows-only.
-        if( (-not $onWindows -and $FriendlyName) -or ($onMacOS -and $CustomStoreName) )
+        if( (-not $supportsFriendlyName -and $FriendlyName) )
         {
             $cert | Should -BeNullOrEmpty
             return
@@ -306,6 +302,16 @@ Describe 'Get-Certificate.when searching for a certificate' {
         if( $CustomStoreName )
         {
             $storeParam = @{ 'FromCustomStore' = $ExpectedStore }
+
+            if( -not $supportsCustomStores )
+            {
+                $cert | Should -BeNullOrEmpty
+                if( $StoreLocation )
+                {
+                    $Global:Error | Should -Match 'store does not exist|keychain could not be found'
+                }
+                return
+            }
         }
         ThenReturnedCert $cert -WithPath $ExpectedPath -For 'CurrentUser' @storeParam
     }
@@ -365,7 +371,7 @@ Describe 'Get-Certificate.when certificate file is password protected' {
         $Global:Error.Count | Should -Be 0
         $cert | Should -Not -BeNullOrEmpty
         $cert.Thumbprint | Should -Be 'DE32D78122C2B5136221DE51B33A2F65A98351D2'
-        if( $onWindows )
+        if( $supportsFriendlyName )
         {
             $cert.FriendlyName | Should -Be 'Carbon Test Certificate - Password Protected'
         }
@@ -393,8 +399,5 @@ Describe 'Get-Certificate.when not using parameter name' {
     }
 }
 
-if( $onWindows )
-{
-    Uninstall-CCertificate -Certificate $TestCert -storeLocation CurrentUser -StoreName My
-    Uninstall-CCertificate -Certificate $TestCert -storeLocation CurrentUser -CustomStoreName 'Carbon'
-}
+Uninstall-CCertificate -Certificate $TestCert -storeLocation CurrentUser -StoreName My
+Uninstall-CCertificate -Certificate $TestCert -storeLocation CurrentUser -CustomStoreName 'Carbon'
