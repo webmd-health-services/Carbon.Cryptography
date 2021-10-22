@@ -68,6 +68,7 @@ $users =
 foreach( $user in $users )
 {
     $credential = [pscredential]::New($user.Name, (ConvertTo-SecureString $password -AsPlainText -Force))
+    $username = $credential.UserName
 
     if( (Test-COperatingSystem -IsWindows) )
     {
@@ -81,38 +82,36 @@ foreach( $user in $users )
     }
     elseif( (Test-COperatingSystem -IsMacOS) )
     {
-        $newUid = 
-            sudo dscl . -list /Users UniqueID | 
-            ForEach-Object { $username,$uid = $_ -split ' +' ; return [int]$uid } |
-            Sort-Object |
-            Select-Object -Last 1
-        Write-Verbose "  Found highest user ID ""$($newUid)""."
-        $newUid += 1
+        if( -not (sudo dscl . -list /Users | Where-Object { $_ -eq $username }) )
+        {
+            $newUid = 
+                sudo dscl . -list /Users UniqueID | 
+                ForEach-Object { $username,$uid = $_ -split ' +' ; return [int]$uid } |
+                Sort-Object |
+                Select-Object -Last 1
+            Write-Verbose "  Found highest user ID ""$($newUid)""."
+            $newUid += 1
 
-        $username = $credential.UserName
-
-        Write-Verbose "  Creating $($username) (uid: $($newUid))"
-        # Create the user account
-        sudo dscl . -create /Users/$username
-        sudo dscl . -create /Users/$username UserShell /bin/bash
-        sudo dscl . -create /Users/$username RealName $username
-        sudo dscl . -create /Users/$username UniqueID $newUid
-        sudo dscl . -create /Users/$username PrimaryGroupID 20
-        sudo dscl . -create /Users/$username NFSHomeDirectory /Users/$username
-        sudo dscl . -passwd /Users/$username $password
-        sudo createhomedir -c
+            Write-Verbose "  Creating $($username) (uid: $($newUid))"
+            # Create the user account
+            sudo dscl . -create /Users/$username
+            sudo dscl . -create /Users/$username UserShell /bin/bash
+            sudo dscl . -create /Users/$username RealName $username
+            sudo dscl . -create /Users/$username UniqueID $newUid
+            sudo dscl . -create /Users/$username PrimaryGroupID 20
+        }
     }
     elseif( (Test-COperatingSystem -IsLinux) )
     {
         $userExists =
             Get-Content '/etc/passwd' |
-            Where-Object { $_ -match "^$([regex]::Escape($credential.UserName))\b"}
+            Where-Object { $_ -match "^$([regex]::Escape($username))\b"}
 
         if( -not $userExists )
         {
-            Write-Verbose -Message ("Adding user ""$($credential.UserName)"".")
+            Write-Verbose -Message ("Adding user ""$($username)"".")
             $encryptedPassword = $password | openssl passwd -stdin -salt $salt
-            sudo useradd -p $encryptedPassword -m $credential.UserName --comment $user.Description
+            sudo useradd -p $encryptedPassword -m $username --comment $user.Description
         }
     }
 }

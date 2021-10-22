@@ -4,39 +4,31 @@ Set-StrictMode -Version 'Latest'
 
 & (Join-Path -Path $PSScriptRoot -ChildPath 'Initialize-Test.ps1' -Resolve)
 
-$onWindows = Test-TCOperatingSystem -IsWindows
-if( -not $onWindows )
-{
-    Write-Warning -Message ('TODO: Get Uninstall-Certificate working on non-Windows platforms.')
-    return
-}
-
 $TestCertPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificate.pfx' -Resolve
 $TestCert = New-Object Security.Cryptography.X509Certificates.X509Certificate2 $TestCertPath
-
-# Some tests work with local machine stores, and thus require admin access.
-$skipAdminTests = -not (Test-IsAdministrator)
-$skipAdminTestParam = @{
-    'Skip' = $skipAdminTests;
-}
-
-$skipRemotingTests = (Test-RunningUnderBuildServer) -or $skipAdminTests
-$skipRemotingParam = @{
-    'Skip' = $skipRemotingTests;
-}
 
 function Init
 {
     # Make sure there's no local machine cert "inheriting" down to the current user's store.
-    if( (Test-Path -Path "cert:\*\My\$($TestCert.Thumbprint)") )
-    {
-        Uninstall-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation LocalMachine -StoreName My
-        Uninstall-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -StoreName My
-    }
+    Uninstall-CCertificate -Thumbprint $TestCert.Thumbprint
+    Install-CCertificate -Path $TestCertPath `
+                         -StoreLocation CurrentUser `
+                         -StoreName My `
+                         -Exportable:(Test-TCertificate -MustBeExportable)
+    $Global:Error.Clear()
+}
 
-    if( -not (Test-Path Cert:\CurrentUser\My\$TestCert.Thumbprint -PathType Leaf) )
+function ThenFailed
+{
+    [CmdletBinding()]
+    param(
+        [String] $WithErrorMatching
+    )
+    $Global:Error | Should -Not -BeNullOrEmpty
+
+    if( $WithErrorMatching )
     {
-        Install-CCertificate -Path $TestCertPath -StoreLocation CurrentUser -StoreName My
+        $Global:Error | Should -Match $WithErrorMatching
     }
 }
 
@@ -76,32 +68,53 @@ Describe 'Uninstall-Certificate' {
 
     It 'should uninstall certificate from custom store' {
         Init
+        $errorActionParam = @{}
+        if( -not (Test-CustomStore -IsSupported -Location CurrentUser) )
+        {
+            $errorActionParam['ErrorAction'] = 'SilentlyContinue'
+        }
         # Make sure there's no local machine cert "inheriting" down to the current user's store.
-        Uninstall-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation LocalMachine -CustomStoreName 'Carbon'
+        if( (Test-IsAdministrator) -and (Test-MyStore -IsSupported -Location LocalMachine) )
+        {
+            Uninstall-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation LocalMachine -CustomStoreName 'Carbon'
+        }
         $cert = Install-CCertificate -Path $TestCertPath -StoreLocation CurrentUser -CustomStoreName 'Carbon' -PassThru
         $cert | Should -Not -BeNullOrEmpty
-        $certPath = 'Cert:\CurrentUser\Carbon\{0}' -f $cert.Thumbprint
-        $certPath | Should -Exist
-        Uninstall-CCertificate -Thumbprint $cert.Thumbprint -StoreLocation CurrentUser -CustomStoreName 'Carbon' -Verbose
-        while( (Test-Path -Path $certPath) )
+        Get-CCertificate -StoreLocation CurrentUser -CustomStoreName 'Carbon' -Thumbprint $cert.Thumbprint |
+            Should -Not -BeNullOrEmpty
+        Uninstall-CCertificate -Thumbprint $cert.Thumbprint `
+                               -StoreLocation CurrentUser `
+                               -CustomStoreName 'Carbon' `
+                               @errorActionParam
+        if( (Test-CustomStore -IsSupported -Location CurrentUser) )
         {
-            Write-Verbose -Message ('Waiting for "{0}" to get deleted.' -f $certPath)
-            Start-Sleep -Seconds 1
+            while( (Get-CCertificate -StoreLocation CurrentUser -CustomStoreName 'Carbon' -Thumbprint $cert.Thumbprint) )
+            {
+                Write-Verbose -Message ('Waiting for "{0}" to get deleted.' -f $certPath)
+                Start-Sleep -Seconds 1
+            }
+            Get-CCertificate -StoreLocation CurrentUser -CustomStoreName 'Carbon' -Thumbprint $cert.Thumbprint |
+                Should -BeNullOrEmpty    
         }
-        $certPath | Should -Not -Exist
+        else
+        {
+            ThenFailed -WithErrorMatching 'exception reading certificates'
+        }
     }
 
-    It 'should uninstall certificate from remote computer' @skipRemotingParam {
+    It 'should uninstall certificate from remote computer' -Skip:(-not (Test-Remoting -IsAvailable)) {
         Init
         $Global:Error.Clear()
 
-        $session = New-PSSession -ComputerName $env:COMPUTERNAME
+        [int32]$timeout = [TimeSpan]::New(0, 0, 10).TotalMilliseconds
+        $sessionOptions = New-PSSessionOption -OpenTimeout $timeout -CancelTimeout $timeout -OperationTimeout $timeout
+        $session = New-PSSession -ComputerName $env:COMPUTERNAME -SessionOption $sessionOptions
         try
         {
             Uninstall-CCertificate -Thumbprint $TestCert.Thumbprint `
-                                  -StoreLocation CurrentUser `
-                                  -StoreName My `
-                                  -Session $session
+                                   -StoreLocation CurrentUser `
+                                   -StoreName My `
+                                   -Session $session
             $Global:Error.Count | Should -Be 0
 
             $cert = Get-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -StoreName My
@@ -116,7 +129,9 @@ Describe 'Uninstall-Certificate' {
 
 function GivenARemotingSession
 {
-    $script:session = New-PSSession -ComputerName $env:COMPUTERNAME
+    [int32]$timeout = [TimeSpan]::New(0, 0, 10).TotalMilliseconds
+    $sessionOptions = New-PSSessionOption -OpenTimeout $timeout -CancelTimeout $timeout -OperationTimeout $timeout
+    $script:session = New-PSSession -ComputerName $env:COMPUTERNAME -SessionOption $sessionOptions
 }
 
 function GivenAnInstalledCertificate
@@ -162,7 +177,12 @@ function WhenUninstallPipedThumbprint
 
 function ThenCertificateUninstalled
 {
-    Join-Path -Path 'cert:\*\*' -ChildPath $TestCert.Thumbprint | Should -Not -Exist
+    $certs = Get-CCertificate -Thumbprint $TestCert.Thumbprint
+    if( $certs )
+    {
+        $certs | Format-Table -AutoSize | Out-String | Write-Verbose -Verbose
+    }
+    $certs | Should -BeNullOrEmpty
 }
 
 Describe 'Uninstall-Certificate.when given just the certificate thumbprint' {
@@ -175,12 +195,15 @@ Describe 'Uninstall-Certificate.when given just the certificate thumbprint' {
 }
 
 Describe 'Uninstall-Certificate.when given just the certificate thumbprint and installed in multiple stores' {
-    It 'should find and uninstall the certificate from all stores' @skipAdminTestParam {
+    It 'should find and uninstall the certificate from all stores' {
         Init
-        GivenAnInstalledCertificate
         GivenAnInstalledCertificate -StoreLocation 'CurrentUser' -StoreName 'My'
-        GivenAnInstalledCertificate -StoreLocation 'LocalMachine' -StoreName 'My'
-        GivenAnInstalledCertificate -StoreLocation 'LocalMachine' -StoreName 'Root'
+        $location = 'CurrentUser'
+        if( (Test-IsAdministrator) -and -not (Test-LocalMachineStore -IsReadOnly) )
+        {
+            $location = 'LocalMachine'
+        }
+        GivenAnInstalledCertificate -StoreLocation $location -StoreName 'CertificateAuthority'
         WhenUninstallingByThumbprint
         ThenCertificateUninstalled
     }
@@ -211,24 +234,4 @@ Describe 'Uninstall-Certificate.when piped multiple thumbprints' {
         WhenPipedMultipleThumbprints
         ThenCertificateUninstalled
     }
-}
-
-# This test ensures that certificates are uninstalled from LocalMachine stores *first*, since they will also show up in CurrentUser stores and if SYSTEM deletes the certificate in a headless process from the CurrentUser stores first, it will fail.
-Describe 'Uninstall-Certificate.when local machine cert shows up in current user store' {
-    It 'should delete from local machine store first' @skipAdminTestParam {
-        Init
-        GivenAnInstalledCertificate
-        Mock -CommandName 'Get-ChildItem' `
-             -ModuleName 'Carbon.Cryptography' `
-             -ParameterFilter { $Path.Count -eq 2 -and $Path[0] -eq 'Cert:\LocalMachine' -and $Path[1] -eq 'Cert:\CurrentUser' } 
-        WhenUninstallingByThumbprint
-        Assert-MockCalled -CommandName 'Get-ChildItem' -ModuleName 'Carbon.Cryptography' -Times 1
-    }
-}
-
-if( $skipAdminTests )
-{
-    $msg = 'Tests to ensure Uninstall-Certificate works over remoting were not run. Remoting tests require ' +
-            'administrator rights. Make sure to run these tests as an administrator.'
-    Write-Warning -Message $msg
 }

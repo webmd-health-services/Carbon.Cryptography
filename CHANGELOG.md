@@ -1,4 +1,13 @@
 
+# 2.1.0
+
+* `Install-CCertificate` now works on Linux and macOS.
+* `Uninstall-CCertificate` now works on Linux and macOS.
+* Fixed: `Get-CCertificate` only returns one instance of a certificate even if that certificate exists in multiple
+  stores and/or locations.
+* `Uninstall-CCertificate` no longer opens a store for writing if the certificate to delete isn't installed.
+
+
 # 2.0.0
 
 ## Upgrade Instructions

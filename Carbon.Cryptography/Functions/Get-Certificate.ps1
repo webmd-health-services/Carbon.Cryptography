@@ -200,12 +200,18 @@ function Get-Certificate
             {
                 try
                 {
-                    $ctorParams = @( $item.FullName, $Password )
-                    if( $KeyStorageFlags )
+                    $ctorParams = @($item.FullName, $Password )
+                    if( $PSBoundParameters.ContainsKey('KeyStorageFlags') )
                     {
+                        # macOS doesn't allow ephemeral key storage, which is kind of weird but whatever.
+                        if( (Test-TCOperatingSystem -MacOS) )
+                        {
+                            $KeyStorageFlags = 
+                                $KeyStorageFlags -band -bnot [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
+                        }
                         $ctorParams += $KeyStorageFlags
                     }
-                    New-Object 'Security.Cryptography.X509Certificates.X509Certificate2' $ctorParams | 
+                    New-Object 'Security.Cryptography.X509Certificates.X509Certificate2' -ArgumentList $ctorParams | 
                         Add-PathMember -Path $item.FullName |
                         Write-Output
                 }
@@ -339,11 +345,12 @@ function Get-Certificate
                 }
             } |
             Where-Object {
-                if( $foundCerts.ContainsKey($_.Thumbprint) )
+                $key = "$($_.StoreLocation)\$($_.StoreName)\$($_.Thumbprint)"
+                if( $foundCerts.ContainsKey($key) )
                 {
                     return $false
                 }
-                $foundCerts[$_.Thumbprint] = $_
+                $foundCerts[$key] = $_
                 return $true
             } |
             Where-Object {
