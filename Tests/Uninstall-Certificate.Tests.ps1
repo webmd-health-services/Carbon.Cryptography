@@ -7,23 +7,29 @@ Set-StrictMode -Version 'Latest'
 $TestCertPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificate.pfx' -Resolve
 $TestCert = New-Object Security.Cryptography.X509Certificates.X509Certificate2 $TestCertPath
 
-$isAdmin = Test-IsAdministrator
-$localMachineLocationAvailable = (Test-TCOperatingSystem -Windows) -and $isAdmin
-$isCustomStoreAvailable = -not (Test-TCOperatingSystem -Windows) -or $isAdmin
-$isRemotingAvailable = -not (Test-RunningUnderBuildServer) -and $isAdmin
-# macOS requires all certificates with private keys to be marked exportable.
-$mustBeExportable = (Test-TCOperatingSystem -MacOS)
-
-if( $isRemotingAvailable -and (Get-Command -Name 'Get-Service' -ErrorAction Ignore) )
-{
-    Start-Service 'WinRM'
-}
-
 function Init
 {
     # Make sure there's no local machine cert "inheriting" down to the current user's store.
     Uninstall-CCertificate -Thumbprint $TestCert.Thumbprint
-    Install-CCertificate -Path $TestCertPath -StoreLocation CurrentUser -StoreName My -Exportable:$mustBeExportable
+    Install-CCertificate -Path $TestCertPath `
+                         -StoreLocation CurrentUser `
+                         -StoreName My `
+                         -Exportable:(Test-TCertificate -MustBeExportable)
+    $Global:Error.Clear()
+}
+
+function ThenFailed
+{
+    [CmdletBinding()]
+    param(
+        [String] $WithErrorMatching
+    )
+    $Global:Error | Should -Not -BeNullOrEmpty
+
+    if( $WithErrorMatching )
+    {
+        $Global:Error | Should -Match $WithErrorMatching
+    }
 }
 
 Describe 'Uninstall-Certificate' {
@@ -60,10 +66,15 @@ Describe 'Uninstall-Certificate' {
         $cert | Should -Not -BeNullOrEmpty
     }
 
-    It 'should uninstall certificate from custom store' -Skip:(-not $isCustomStoreAvailable) {
+    It 'should uninstall certificate from custom store' {
         Init
+        $errorActionParam = @{}
+        if( -not (Test-CustomStore -IsSupported -Location CurrentUser) )
+        {
+            $errorActionParam['ErrorAction'] = 'SilentlyContinue'
+        }
         # Make sure there's no local machine cert "inheriting" down to the current user's store.
-        if( $localMachineLocationAvailable )
+        if( (Test-IsAdministrator) -and (Test-MyStore -IsSupported -Location LocalMachine) )
         {
             Uninstall-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation LocalMachine -CustomStoreName 'Carbon'
         }
@@ -71,18 +82,27 @@ Describe 'Uninstall-Certificate' {
         $cert | Should -Not -BeNullOrEmpty
         Get-CCertificate -StoreLocation CurrentUser -CustomStoreName 'Carbon' -Thumbprint $cert.Thumbprint |
             Should -Not -BeNullOrEmpty
-        Uninstall-CCertificate -Thumbprint $cert.Thumbprint -StoreLocation CurrentUser -CustomStoreName 'Carbon' -Verbose
-        
-        while( (Get-CCertificate -StoreLocation CurrentUser -CustomStoreName 'Carbon' -Thumbprint $cert.Thumbprint) )
+        Uninstall-CCertificate -Thumbprint $cert.Thumbprint `
+                               -StoreLocation CurrentUser `
+                               -CustomStoreName 'Carbon' `
+                               @errorActionParam
+        if( (Test-CustomStore -IsSupported -Location CurrentUser) )
         {
-            Write-Verbose -Message ('Waiting for "{0}" to get deleted.' -f $certPath)
-            Start-Sleep -Seconds 1
+            while( (Get-CCertificate -StoreLocation CurrentUser -CustomStoreName 'Carbon' -Thumbprint $cert.Thumbprint) )
+            {
+                Write-Verbose -Message ('Waiting for "{0}" to get deleted.' -f $certPath)
+                Start-Sleep -Seconds 1
+            }
+            Get-CCertificate -StoreLocation CurrentUser -CustomStoreName 'Carbon' -Thumbprint $cert.Thumbprint |
+                Should -BeNullOrEmpty    
         }
-        Get-CCertificate -StoreLocation CurrentUser -CustomStoreName 'Carbon' -Thumbprint $cert.Thumbprint |
-            Should -BeNullOrEmpty
+        else
+        {
+            ThenFailed -WithErrorMatching 'exception reading certificates'
+        }
     }
 
-    It 'should uninstall certificate from remote computer' -Skip:(-not $isRemotingAvailable) {
+    It 'should uninstall certificate from remote computer' -Skip:(-not (Test-Remoting -IsAvailable)) {
         Init
         $Global:Error.Clear()
 
@@ -179,7 +199,7 @@ Describe 'Uninstall-Certificate.when given just the certificate thumbprint and i
         Init
         GivenAnInstalledCertificate -StoreLocation 'CurrentUser' -StoreName 'My'
         $location = 'CurrentUser'
-        if( $localMachineLocationAvailable )
+        if( (Test-IsAdministrator) -and -not (Test-LocalMachineStore -IsReadOnly) )
         {
             $location = 'LocalMachine'
         }

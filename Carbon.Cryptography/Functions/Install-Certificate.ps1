@@ -193,55 +193,70 @@ function Install-Certificate
 
         [Security.Cryptography.X509Certificates.X509Certificate2] $cert = $null
         [Security.Cryptography.X509Certificates.X509Store] $store = $null
-        try
+        if( $CustomStoreName )
         {
-            if( $CustomStoreName )
-            {
-                $storeNameDisplay = $CustomStoreName
-                $store = [Security.Cryptography.X509Certificates.X509Store]::New($CustomStoreName, $StoreLocation)
-            }
-            else
-            {
-                $StoreName = [Security.Cryptography.X509Certificates.StoreName]$StoreName
-                $storeNameDisplay = $StoreName.ToString()
-                $store = [Security.Cryptography.X509Certificates.X509Store]::New($StoreName, $StoreLocation)
-            }
+            $storeNameDisplay = $CustomStoreName
+            $store = [Security.Cryptography.X509Certificates.X509Store]::New($CustomStoreName, $StoreLocation)
+        }
+        else
+        {
+            $StoreName = [Security.Cryptography.X509Certificates.StoreName]$StoreName
+            $storeNameDisplay = $StoreName.ToString()
+            $store = [Security.Cryptography.X509Certificates.X509Store]::New($StoreName, $StoreLocation)
+        }
 
-            if( -not $Force )
+        if( -not $Force )
+        {
+            try
             {
                 $store.Open( ([Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly) )
-                try
+                if( $store.Certificates | Where-Object 'Thumbprint' -eq $Thumbprint )
                 {
-                    if( $store.Certificates | Where-Object 'Thumbprint' -eq $Thumbprint )
-                    {
-                        return
-                    }
-                }
-                finally
-                {
-                    $store.Close()
+                    return
                 }
             }
-
-            $certBytes = [Convert]::FromBase64String( $EncodedCertificate )
-            [IO.File]::WriteAllBytes( $certFilePath, $certBytes )
-
-            # Make sure the key isn't persisted if we're not going to store it. 
-            if( $WhatIf )
+            catch
             {
-                # We don't use EphemeralKeySet because it isn't supported on macOS.
-                $KeyStorageFlags = [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::DefaultKeySet
+                $msg = "Exception reading certificates from $($StoreLocation)\$($storeNameDisplay) store: $($_)"
+                Write-Error -Message $msg -ErrorAction $ErrorActionPreference
+                return
             }
+            finally
+            {
+                $store.Close()
+            }
+        }
 
+        $certBytes = [Convert]::FromBase64String( $EncodedCertificate )
+        [IO.File]::WriteAllBytes( $certFilePath, $certBytes )
+
+        # Make sure the key isn't persisted if we're not going to store it. 
+        if( $WhatIf )
+        {
+            # We don't use EphemeralKeySet because it isn't supported on macOS.
+            $KeyStorageFlags = [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::DefaultKeySet
+        }
+
+        try
+        {
             $cert = 
                 [Security.Cryptography.X509Certificates.X509Certificate2]::New($certFilePath, $Password, $KeyStorageFlags)
+        }
+        catch
+        {
+            $msg = "Exception reading certificate from file: $($_)"
+            Write-Error -Message $msg -ErrorAction $ErrorActionPreference
+            return
+        }
+        
+        $description = $cert.FriendlyName
+        if( -not $description )
+        {
+            $description = $cert.Subject
+        }
 
-            $description = $cert.FriendlyName
-            if( -not $description )
-            {
-                $description = $cert.Subject
-            }
-
+        try
+        {
             $store.Open( ([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite) )
 
             $action = "install into $($StoreLocation)\$($storeNameDisplay) store"
@@ -258,13 +273,16 @@ function Install-Certificate
         {
             if( (Test-TCOperatingSystem -MacOS) -and ($cert.HasPrivateKey -and -not $Exportable) )
             {
-                $msg = "Exception importing certificate ""$($description)"" ($($cert.Thumbprint)) into " +
+                $msg = "Exception installing certificate ""$($description)"" ($($cert.Thumbprint)) into " +
                        "$($StoreLocation)\$($storeNameDisplay): $($_). On macOS, certificates with private keys " +
                        "must be exportable. Update $($MyInvocation.MyCommand.Name) with the ""-Exportable"" switch."
                 Write-Error -Message $msg -ErrorAction $ErrorActionPreference
                 return
             }
-            throw
+
+            $msg = "Exception installing certificate in $($StoreLocation)\$($storeNameDisplay) store: $($_)"
+            Write-Error -Message $msg -ErrorAction $ErrorActionPreference
+            return
         }
         finally
         {

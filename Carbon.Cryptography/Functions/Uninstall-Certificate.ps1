@@ -118,7 +118,6 @@ function Uninstall-Certificate
                 Get-CCertificate -StoreLocation LocalMachine -Thumbprint $Thumbprint
                 Get-CCertificate -StoreLocation CurrentUser -Thumbprint $Thumbprint
             }
-            Write-Verbose "121  $($certsToDelete | Measure-Object | Select-Object -ExpandProperty 'Count')"
             foreach( $certToDelete in $certsToDelete )
             {
                 Uninstall-CCertificate -Thumbprint $Thumbprint `
@@ -175,24 +174,30 @@ function Uninstall-Certificate
                 $store = [Security.Cryptography.X509Certificates.X509Store]::New($StoreName, $StoreLocation)
             }
 
-            $store.Open( ([Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly) )
             $certToRemove = $null
             try
             {
+                $store.Open( ([Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly) )
                 $certToRemove = $store.Certificates | Where-Object { $_.Thumbprint -eq $Thumbprint }
                 if( -not $certToRemove )
                 {
                     return
                 }
             }
+            catch
+            {
+                $msg = "Exception reading certificates from $($StoreLocation)\$($storeNameDisplay) store: $($_)"
+                Write-Error -Message $msg -ErrorAction $ErrorActionPreference
+                return
+            }
             finally
             {
                 $store.Close()
             }
 
-            $store.Open( ([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite) )
             try
             {
+                $store.Open( ([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite) )
                 $target = $certToRemove.FriendlyName
                 if( -not $target )
                 {
@@ -207,6 +212,12 @@ function Uninstall-Certificate
                     Write-Verbose $msg
                     $certToRemove | ForEach-Object { $store.Remove($_) }
                 }
+            }
+            catch
+            {
+                $msg = "Exception uninstalling certificate in $($StoreLocation)\$($storeNameDisplay) store: $($_)"
+                Write-Error -Message $msg -ErrorAction $ErrorActionPreference
+                return
             }
             finally
             {

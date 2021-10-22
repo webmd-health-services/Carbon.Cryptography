@@ -41,8 +41,7 @@ function Init
         Install-CCertificate -Path $testCertPath `
                              -StoreLocation CurrentUser `
                              -StoreName My `
-                             -Exportable:$mustBeExportable `
-                             -Verbose
+                             -Exportable:$mustBeExportable
     }
 
 
