@@ -46,7 +46,7 @@ function Init
 
 
     if( $supportsCustomStores -and `
-        -not (Get-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -CustomStoreName 'Carbon') )
+        -not (Get-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -CustomStoreName 'Carbon' ) )
     {
         Install-CCertificate -Path $testCertPath `
                              -StoreLocation CurrentUser `

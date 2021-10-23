@@ -1,4 +1,10 @@
 
+# 2.1.1
+
+* Fixed: `Uninstall-CCertificate` and `Install-CCertificate` can fail if the module's default prefix is changed.
+* Fixed: `Get-CCertificate` didn't fail when the user can't open or read a certificate store.
+
+
 # 2.1.0
 
 * `Install-CCertificate` now works on Linux and macOS.

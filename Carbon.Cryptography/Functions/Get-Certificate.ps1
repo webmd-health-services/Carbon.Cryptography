@@ -335,9 +335,9 @@ function Get-Certificate
                 }
                 catch
                 {
-                    $msg = "Exception opening and iterating certificates in ""$($store.Location) ""$($store.Name)"" " +
+                    $msg = "Exception opening and iterating certificates in ""$($store.Location)\$($store.Name)"" " +
                            "store: $($_)"
-                    Write-Debug -Message $msg
+                    Write-Error -Message $msg -ErrorAction $ErrorActionPreference
                 }
                 finally
                 {

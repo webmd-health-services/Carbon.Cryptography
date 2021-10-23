@@ -115,14 +115,14 @@ function Uninstall-Certificate
             # the CurrentUser store first, you'll get errors when running non-
             # interactively as SYSTEM.
             $certsToDelete = & {
-                Get-CCertificate -StoreLocation LocalMachine -Thumbprint $Thumbprint
-                Get-CCertificate -StoreLocation CurrentUser -Thumbprint $Thumbprint
+                Get-Certificate -StoreLocation LocalMachine -Thumbprint $Thumbprint
+                Get-Certificate -StoreLocation CurrentUser -Thumbprint $Thumbprint
             }
             foreach( $certToDelete in $certsToDelete )
             {
-                Uninstall-CCertificate -Thumbprint $Thumbprint `
-                                       -StoreLocation $certToDelete.StoreLocation `
-                                       -StoreName $certToDelete.StoreName
+                Uninstall-Certificate -Thumbprint $Thumbprint `
+                                      -StoreLocation $certToDelete.StoreLocation `
+                                      -StoreName $certToDelete.StoreName
             }
             return
         }

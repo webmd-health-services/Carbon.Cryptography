@@ -319,7 +319,7 @@ function Install-Certificate
         {
             $storeParam = @{ CustomStoreName = $CustomStoreName }
         }
-        return Get-CCertificate -Thumbprint $thumbprint -StoreLocation $StoreLocation @storeParam
+        return Get-Certificate -Thumbprint $thumbprint -StoreLocation $StoreLocation @storeParam
     }
 }
 
