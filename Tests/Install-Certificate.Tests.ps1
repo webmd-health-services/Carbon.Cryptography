@@ -366,7 +366,10 @@ foreach( $location in @('CurrentUser', 'LocalMachine') )
                 return
             }
             ThenNothingReturned
-            Get-CCertificate -StoreLocation $location -StoreName My -Thumbprint $testCert.Thumbprint |
+            Get-CCertificate -StoreLocation $location `
+                             -StoreName My `
+                             -Thumbprint $testCert.Thumbprint `
+                             -ErrorAction Ignore |
                 Should -BeNullOrEmpty
         }
     }

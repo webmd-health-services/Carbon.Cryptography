@@ -186,7 +186,13 @@ function Uninstall-Certificate
             }
             catch
             {
-                $msg = "Exception reading certificates from $($StoreLocation)\$($storeNameDisplay) store: $($_)"
+                $ex = $_.Exception.InnerException
+                while( $ex.InnerException )
+                {
+                    $ex = $ex.InnerException
+                }
+                $msg = "[$($ex.GetType().FullName)] exception reading certificates from $($StoreLocation)\" +
+                       "$($storeNameDisplay) store: $($ex)"
                 Write-Error -Message $msg -ErrorAction $ErrorActionPreference
                 return
             }
@@ -215,7 +221,13 @@ function Uninstall-Certificate
             }
             catch
             {
-                $msg = "Exception uninstalling certificate in $($StoreLocation)\$($storeNameDisplay) store: $($_)"
+                $ex = $_.Exception.InnerException
+                while( $ex.InnerException )
+                {
+                    $ex = $ex.InnerException
+                }
+                $msg = "[$($ex.GetType().FullName)] exception uninstalling certificate in $($StoreLocation)\" +
+                       "$($storeNameDisplay) store: $($ex)"
                 Write-Error -Message $msg -ErrorAction $ErrorActionPreference
                 return
             }

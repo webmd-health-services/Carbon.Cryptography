@@ -9,12 +9,6 @@ $TestCert = New-Object Security.Cryptography.X509Certificates.X509Certificate2 $
 $testCertificateThumbprint = '7D5CE4A8A5EC059B829ED135E9AD8607977691CC'
 $testCertFriendlyName = 'Pup Test Certificate'
 $testCertSubject = 'CN=example.com'
-$testCertCertProviderPath = 'cert:\CurrentUser\My\{0}' -f $testCertificateThumbprint
-# macOS requires all certificates with private keys to be marked exportable.
-$mustBeExportable = (Test-TCOperatingSystem -MacOS)
-$supportsCustomStores = -not (Test-TCOperatingSystem -MacOS)
-
-$supportsFriendlyName = Test-TCOperatingSystem -IsWindows
 
 function Assert-TestCert
 {
@@ -24,6 +18,37 @@ function Assert-TestCert
         
     $actualCert | Should -Not -BeNullOrEmpty
     $actualCert.Thumbprint | Should -Be $TestCert.Thumbprint
+}
+
+function ConvertTo-Parameter
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory, ValueFromPipeline)]
+        [hashtable] $InputObject
+    )
+
+    process
+    {
+        $params = @{}
+        foreach( $key in $InputObject.Keys )
+        {
+            if( $key -like 'Expected*' )
+            {
+                continue
+            }
+
+            $value = $InputObject[$key]
+            if( -not $value )
+            {
+                continue
+            }
+
+            $params[$key] = $value
+        }
+
+        return ,$params
+    }
 }
 
 function Init
@@ -36,23 +61,132 @@ function Init
 
     $Global:Error.Clear()
 
-    if( -not (Get-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -StoreName My) ) 
+    if( -not (Get-CCertificate -Thumbprint $TestCert.Thumbprint `
+                               -StoreLocation CurrentUser `
+                               -StoreName My `
+                               -ErrorAction Ignore) ) 
     {
         Install-CCertificate -Path $testCertPath `
                              -StoreLocation CurrentUser `
                              -StoreName My `
-                             -Exportable:$mustBeExportable
+                             -Exportable:(Test-TCertificate -MustBeExportable)
     }
 
+    if( (Test-CustomStore -IsSupported -Location LocalMachine) -and `
+        -not (Test-CustomStore -IsReadOnly -Location LocalMachine) )
+    {
+        Uninstall-CCertificate -Thumbprint $testCertificateThumbprint `
+                               -CustomStoreName 'Carbon' `
+                               -StoreLocation LocalMachine `
+                               -ErrorAction Stop
+    }
 
-    if( $supportsCustomStores -and `
-        -not (Get-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -CustomStoreName 'Carbon' ) )
+    if( (Test-CustomStore -IsSupported -Location CurrentUser) -and `
+        -not (Test-CustomStore -IsReadOnly -Location CurrentUser) )
     {
         Install-CCertificate -Path $testCertPath `
                              -StoreLocation CurrentUser `
                              -CustomStoreName 'Carbon' `
-                             -Exportable:$mustBeExportable
+                             -Exportable:(Test-TCertificate -MustBeExportable)
     }
+}
+
+
+function Search
+{
+    param(
+        [switch] $ForCurrentUser,
+        [switch] $InMyStore,
+        [switch] $InCustomStore,
+        [switch] $ByThumbprint,
+        [switch] $BySubject,
+        [switch] $ByFriendlyName,
+        [switch] $UsingWildcard,
+        [switch] $ThatDoesNotExist,
+        [String] $ExpectedErrorMessage
+    )
+
+    $testCase = @{
+        StoreLocation = '';
+        StoreName = '';
+        CustomStoreName = '';
+        Thumbprint = '';
+        Subject = '';
+        FriendlyName = '';
+        ExpectedPath = '';
+        ExpectedStore = 'My';
+        Exists = -not $ThatDoesNotExist;
+    }
+
+    if( $InCustomStore )
+    {
+        $testCase['ExpectedStore'] = 'Carbon'
+    }
+
+    if( (Test-Path -Path 'cert:') )
+    {
+        $testCase['ExpectedPath'] = Join-Path -Path 'cert:\CurrentUser' -ChildPath $testCase['ExpectedStore']
+        $testCase['ExpectedPath'] = Join-Path -Path $testCase['ExpectedPath'] -ChildPath $testCertificateThumbprint
+    }
+
+    if( $ForCurrentUser )
+    {
+        $testCase['StoreLocation'] = 'CurrentUser'
+    }
+
+    if( $InMyStore )
+    {
+        $testCase['StoreName'] = 'My'
+    }
+
+    if( $InCustomStore )
+    {
+        $testCase['CustomStoreName'] = 'Carbon'
+    }
+
+    if( $ByThumbprint )
+    {
+        $searchKey = 'Thumbprint'
+        $searchValue = $TestCert.Thumbprint
+        $errPrefix = 'thumbprint ".*"'
+    }
+
+    if( $BySubject )
+    {
+        $searchKey = 'Subject'
+        $searchValue = $testCertSubject
+        $errPrefix = 'subject ".*"'
+    }
+
+    if( $ByFriendlyName )
+    {
+        $searchKey = 'FriendlyName'
+        $searchValue = $testCertFriendlyName
+        $errPrefix = 'friendly name ".*"'
+    }
+
+    if( $ThatDoesNotExist )
+    {
+        $searchValue = 'doesnotexist'
+    }
+
+    if( $searchValue )
+    {
+        if( $UsingWildcard )
+        {
+            $searchValue = $searchValue.Substring(0, $searchValue.Length -1)
+            $searchValue = "$($searchValue)*"
+        }
+
+        $testCase[$searchKey] = $searchValue
+    }
+
+    if( $ExpectedErrorMessage )
+    {
+        $testCase['ExpectedErrorMessage'] = "$($errPrefix) does not exist in $($ExpectedErrorMessage)"
+    }
+
+    return $testCase
 }
 
 function ThenReturnedCert
@@ -102,94 +236,26 @@ Describe 'Get-Certificate.when getting certificate from a file' {
 }
 
 Describe 'Get-Certificate.when getting certificate by path from certificate store' {
-    It ('should have Path property') -Skip:(-not (Test-Path -Path 'cert:')) {
+    It ('should have Path property') {
         Init
-        $cert = Get-CCertificate -Path $testCertCertProviderPath
-        $cert.Path | Should -Be $testCertCertProviderPath
-    }
-}
-
-function Search
-{
-    param(
-        [switch] $ForCurrentUser,
-        [switch] $InMyStore,
-        [switch] $InCustomStore,
-        [switch] $ByThumbprint,
-        [switch] $BySubject,
-        [switch] $ByFriendlyName,
-        [switch] $UsingWildcard
-    )
-
-    $testCase = @{
-        StoreLocation = '';
-        StoreName = '';
-        CustomStoreName = '';
-        Thumbprint = '';
-        Subject = '';
-        FriendlyName = '';
-        ExpectedPath = '';
-        ExpectedStore = 'My'
-    }
-
-    if( $InCustomStore )
-    {
-        $testCase['ExpectedStore'] = 'Carbon'
-    }
-
-    if( (Test-Path -Path 'cert:') )
-    {
-        $testCase['ExpectedPath'] = Join-Path -Path 'cert:\CurrentUser' -ChildPath $testCase['ExpectedStore']
-        $testCase['ExpectedPath'] = Join-Path -Path $testCase['ExpectedPath'] -ChildPath $testCertificateThumbprint
-    }
-
-    if( $ForCurrentUser )
-    {
-        $testCase['StoreLocation'] = 'CurrentUser'
-    }
-
-    if( $InMyStore )
-    {
-        $testCase['StoreName'] = 'My'
-    }
-
-    if( $InCustomStore )
-    {
-        $testCase['CustomStoreName'] = 'Carbon'
-    }
-
-    if( $ByThumbprint )
-    {
-        $searchKey = 'Thumbprint'
-        $searchValue = $TestCert.Thumbprint
-    }
-
-    if( $BySubject )
-    {
-        $searchKey = 'Subject'
-        $searchValue = $testCertSubject
-    }
-
-    if( $ByFriendlyName )
-    {
-        $searchKey = 'FriendlyName'
-        $searchValue = $testCertFriendlyName
-    }
-
-    if( $searchValue )
-    {
-        if( $UsingWildcard )
+        $errorActionParam = @{ 'ErrorAction' = 'SilentlyContinue' }
+        $testCertCertProviderPath = "cert:\CurrentUser\My\$($testCertificateThumbprint)"
+        if( (Test-Path -Path 'cert:') )
         {
-            $searchValue = $searchValue.Substring(0, $searchValue.Length -1)
-            $searchValue = "$($searchValue)*"
+            $errorActionParam = @{}
         }
-
-        $testCase[$searchKey] = $searchValue
+        $cert = Get-CCertificate -Path $testCertCertProviderPath @errorActionParam
+        if( (Test-Path -Path 'cert:') )
+        {
+            $cert.Path | Should -Be $testCertCertProviderPath
+        }
+        else
+        {
+            $cert | Should -BeNullOrEmpty
+            $Global:Error | Should -Match '"cert:.*" not found'
+        }
     }
-
-    return $testCase
 }
-
 $searchTestCases = & {
     # Search in all stores.
     Search -ByThumbprint
@@ -201,6 +267,7 @@ $searchTestCases = & {
 
     # Search all stores for single location.
     Search -ForCurrentUser -ByThumbprint
+    Search -ForCurrentUser -ByThumbprint -UsingWildcard
     Search -ForCurrentUser -ByThumbprint -UsingWildcard
     Search -ForCurrentUser -BySubject
     Search -ForCurrentUser -BySubject -UsingWildcard
@@ -223,56 +290,32 @@ $searchTestCases = & {
     Search -ForCurrentUser -InMyStore -ByFriendlyName
     Search -ForCurrentUser -InMyStore -ByFriendlyName -UsingWildcard
 
-    # Search a custom store in all locations.
-    Search -InCustomStore -ByThumbprint
-    Search -InCustomStore -ByThumbprint -UsingWildcard
-    Search -InCustomStore -BySubject
-    Search -InCustomStore -BySubject -UsingWildcard
-    Search -InCustomStore -ByFriendlyName
-    Search -InCustomStore -ByFriendlyName -UsingWildcard
-
-    # Search a custom store for a single location.
-    Search -ForCurrentUser -InCustomStore -ByThumbprint
-    Search -ForCurrentUser -InCustomStore -ByThumbprint -UsingWildcard
-    Search -ForCurrentUser -InCustomStore -BySubject
-    Search -ForCurrentUser -InCustomStore -BySubject -UsingWildcard
-    Search -ForCurrentUser -InCustomStore -ByFriendlyName
-    Search -ForCurrentUser -InCustomStore -ByFriendlyName -UsingWildcard
-}
-
-function ConvertTo-Parameter
-{
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory, ValueFromPipeline)]
-        [hashtable] $InputObject
-    )
-
-    process
+    if( (Test-CustomStore -IsSupported -Location CurrentUser) -and `
+        -not (Test-CustomStore -IsReadOnly -Location CurrentUser) )
     {
-        $params = @{}
-        foreach( $key in $InputObject.Keys )
-        {
-            if( $key -like 'Expected*' )
-            {
-                continue
-            }
+        # Search a custom store in all locations.
+        Search -InCustomStore -ByThumbprint -UsingWildcard
+        Search -InCustomStore -BySubject -UsingWildcard
+        Search -InCustomStore -ByFriendlyName -UsingWildcard
 
-            $value = $InputObject[$key]
-            if( -not $value )
-            {
-                continue
-            }
+        # Search a custom store for a single location.
+        Search -ForCurrentUser -InCustomStore -ByThumbprint -UsingWildcard
+        Search -ForCurrentUser -InCustomStore -BySubject -UsingWildcard
+        Search -ForCurrentUser -InCustomStore -ByFriendlyName -UsingWildcard
 
-            $params[$key] = $value
-        }
-
-        return ,$params
+        Search -InCustomStore -ByThumbprint
+        Search -InCustomStore -BySubject
+        Search -InCustomStore -ByFriendlyName
+    
+        Search -ForCurrentUser -InCustomStore -ByThumbprint
+        Search -ForCurrentUser -InCustomStore -BySubject
+        Search -ForCurrentUser -InCustomStore -ByFriendlyName
+    
     }
 }
 
 $itMsg = 'in { Location = <StoreLocation>; Store = <StoreName>; CustomStoreName = <CustomStoreName> } by { Thumbprint = ' +
-         '<Thumbprint> ; Subject = <Subject> ; FriendlyName = <FriendlyName> }'
+         '<Thumbprint> ; Subject = <Subject> ; FriendlyName = <FriendlyName> } that { Exists = <Exists> }'
 Describe 'Get-Certificate.when searching for a certificate' {
     It $itMsg -TestCases $searchTestCases {
         param(
@@ -283,15 +326,20 @@ Describe 'Get-Certificate.when searching for a certificate' {
             $Subject,
             $FriendlyName,
             $ExpectedPath,
-            $ExpectedStore
+            $ExpectedStore,
+            $Exists
         )
         
         Init
+
         $params = ,$PSBoundParameters | ConvertTo-Parameter
-        $cert = Get-CCertificate @params
+        $params.Remove('Exists')
+        $params.Remove('ExpectedPath')
+        $params.Remove('ExpectedStore')
+        $cert = Get-CCertificate @params -ErrorAction SilentlyContinue
 
         # Friendly names are Windows-only.
-        if( (-not $supportsFriendlyName -and $FriendlyName) )
+        if( $FriendlyName -and (-not (Test-FriendlyName -IsSupported)) )
         {
             $cert | Should -BeNullOrEmpty
             return
@@ -301,27 +349,131 @@ Describe 'Get-Certificate.when searching for a certificate' {
         if( $CustomStoreName )
         {
             $storeParam = @{ 'FromCustomStore' = $ExpectedStore }
-
-            if( -not $supportsCustomStores )
-            {
-                $cert | Should -BeNullOrEmpty
-                if( $StoreLocation )
-                {
-                    $Global:Error | Should -Match 'store does not exist|keychain could not be found'
-                }
-                return
-            }
         }
         ThenReturnedCert $cert -WithPath $ExpectedPath -For 'CurrentUser' @storeParam
     }
 }
 
-Describe 'Get-Certificate.when certificate does not exist' {
-    It 'should not throw error when certificate does not exist' {
+$notFoundTestCases = & {
+    @{ 'Thumbprint' = 'deadbee*' }
+    @{ 'Thumbprint' = 'deadbee*' ; 'StoreName' = 'My' ; }
+    @{ 'Thumbprint' = 'deadbee*' ; 'StoreLocation' = 'CurrentUser' ; }
+    @{ 'Thumbprint' = 'deadbee*' ; 'StoreLocation' = 'CurrentUser' ; 'StoreName' = 'My' }
+
+    @{ 'Subject' = "CN=$($PSCommandPath)*" }
+    @{ 'Subject' = "CN=$($PSCommandPath)*"; 'StoreName' = 'My' ; }
+    @{ 'Subject' = "CN=$($PSCommandPath)*"; 'StoreLocation' = 'CurrentUser' ; }
+    @{ 'Subject' = "CN=$($PSCommandPath)*"; 'StoreLocation' = 'CurrentUser' ; 'StoreName' = 'My' }
+
+    @{ 'FriendlyName' = "$($PSCommandPath)*" }
+    @{ 'FriendlyName' = "$($PSCommandPath)*"; 'StoreName' = 'My' ; }
+    @{ 'FriendlyName' = "$($PSCommandPath)*"; 'StoreLocation' = 'CurrentUser' ; }
+    @{ 'FriendlyName' = "$($PSCommandPath)*"; 'StoreLocation' = 'CurrentUser' ; 'StoreName' = 'My' }
+
+    if( -not (Test-CustomStore -IsSupported -Location CurrentUser) )
+    {
+        # Search a custom store in all locations.
+        Search -InCustomStore -ByThumbprint -UsingWildcard
+        Search -InCustomStore -BySubject -UsingWildcard
+        Search -InCustomStore -ByFriendlyName -UsingWildcard
+
+        # Search a custom store for a single location.
+        Search -ForCurrentUser -InCustomStore -ByThumbprint -UsingWildcard
+        Search -ForCurrentUser -InCustomStore -BySubject -UsingWildcard
+        Search -ForCurrentUser -InCustomStore -ByFriendlyName -UsingWildcard
+    }
+} |
+    ForEach-Object { $_['Exists'] = $false ; $_ | Write-Output }
+
+Describe 'Get-Certificate.when searching for certificates that do not exist using wildcards' {
+    It $itMsg -TestCases $notFoundTestCases {
+        param(
+            $StoreLocation,
+            $StoreName,
+            $CustomStoreName,
+            $Thumbprint,
+            $Subject,
+            $FriendlyName,
+            $ExpectedPath,
+            $ExpectedStore,
+            $Exists
+        )
+        
         Init
-        $cert = Get-CCertificate -Thumbprint '1234567890abcdef1234567890abcdef12345678' -StoreLocation CurrentUser -StoreName My -ErrorAction SilentlyContinue
-        $Global:Error.Count | Should -Be 0
+
+        $params = ,$PSBoundParameters | ConvertTo-Parameter
+        $params.Remove('Exists')
+        $params.Remove('ExpectedPath')
+        $params.Remove('ExpectedStore')
+        $cert = Get-CCertificate @params
+
         $cert | Should -BeNullOrEmpty
+        $Global:Error | Should -BeNullOrEmpty
+    }
+}
+
+$failedSearchTestCases = & {
+    # Search a single store for a single location.
+    $expectedErrorMsg = 'the CurrentUser\\My store'
+    Search -ForCurrentUser -InMyStore -ByThumbprint -ThatDoesNotExist -ExpectedErrorMessage $expectedErrorMsg
+    Search -ForCurrentUser -InMyStore -BySubject -ThatDoesNotExist -ExpectedErrorMessage $expectedErrorMsg
+    Search -ForCurrentUser -InMyStore -ByFriendlyName -ThatDoesNotExist -ExpectedErrorMessage $expectedErrorMsg
+
+    # Search a custom store for a single location.
+    $expectedErrorMsg = 'the CurrentUser\\Carbon custom store'
+    Search -ForCurrentUser -InCustomStore -ByThumbprint -ThatDoesNotExist -ExpectedErrorMessage $expectedErrorMsg
+    Search -ForCurrentUser -InCustomStore -BySubject -ThatDoesNotExist -ExpectedErrorMessage $expectedErrorMsg
+    Search -ForCurrentUser -InCustomStore -ByFriendlyName -ThatDoesNotExist -ExpectedErrorMessage $expectedErrorMsg
+
+    if( -not (Test-CustomStore -IsSupported -Location CurrentUser) -or `
+        (Test-CustomStore -IsReadOnly -Location CurrentUser) )
+    {
+        $expectedErrorMsg = 'the CurrentUser\\Carbon custom store'
+        Search -InCustomStore -ByThumbprint -ExpectedErrorMessage $expectedErrorMsg
+        Search -InCustomStore -BySubject -ExpectedErrorMessage $expectedErrorMsg
+        Search -InCustomStore -ByFriendlyName -ExpectedErrorMessage $expectedErrorMsg
+    
+        Search -ForCurrentUser -InCustomStore -ByThumbprint -ExpectedErrorMessage $expectedErrorMsg
+        Search -ForCurrentUser -InCustomStore -BySubject -ExpectedErrorMessage $expectedErrorMsg
+        Search -ForCurrentUser -InCustomStore -ByFriendlyName -ExpectedErrorMessage $expectedErrorMsg
+    }
+}
+
+Describe 'Get-Certificate.when certificate does not exist' {
+    It $itMsg -TestCases $failedSearchTestCases {
+        param(
+            $StoreLocation,
+            $StoreName,
+            $CustomStoreName,
+            $Thumbprint,
+            $Subject,
+            $FriendlyName,
+            $ExpectedPath,
+            $ExpectedStore,
+            $Exists,
+            $ExpectedErrorMessage
+        )
+
+        $params = ,$PSBoundParameters | ConvertTo-Parameter
+        $params.Remove('Exists')
+        $params.Remove('ExpectedPath')
+        $params.Remove('ExpectedStore')
+        $params.Remove('ExpectedErrorMessage')
+
+        Init
+        $cert = Get-CCertificate @params -ErrorAction SilentlyContinue
+        $cert | Should -BeNullOrEmpty
+        $Global:Error | Should -HaveCount 1
+        $Global:Error | Should -Match $ExpectedErrorMessage
+    }
+}
+
+Describe 'Get-Certificate.when certificate does not exist but ignoring errors' {
+    It 'should not write an error' {
+        Init
+        $cert = Get-CCertificate -Thumbprint 'deadbee' -StoreLocation CurrentUser -StoreName My -ErrorAction Ignore
+        $cert | Should -BeNullOrEmpty
+        $Global:Error | Should -BeNullOrEmpty
     }
 }
 
@@ -370,7 +522,7 @@ Describe 'Get-Certificate.when certificate file is password protected' {
         $Global:Error.Count | Should -Be 0
         $cert | Should -Not -BeNullOrEmpty
         $cert.Thumbprint | Should -Be 'DE32D78122C2B5136221DE51B33A2F65A98351D2'
-        if( $supportsFriendlyName )
+        if( (Test-FriendlyName -IsSupported) )
         {
             $cert.FriendlyName | Should -Be 'Carbon Test Certificate - Password Protected'
         }
@@ -398,5 +550,8 @@ Describe 'Get-Certificate.when not using parameter name' {
     }
 }
 
-Uninstall-CCertificate -Certificate $TestCert -storeLocation CurrentUser -StoreName My
-Uninstall-CCertificate -Certificate $TestCert -storeLocation CurrentUser -CustomStoreName 'Carbon'
+Uninstall-CCertificate -Certificate $TestCert -StoreLocation CurrentUser -StoreName My
+if( -not (Test-CustomStore -IsReadOnly -Location CurrentUser) )
+{
+    Uninstall-CCertificate -Certificate $TestCert -StoreLocation CurrentUser -CustomStoreName 'Carbon'
+}

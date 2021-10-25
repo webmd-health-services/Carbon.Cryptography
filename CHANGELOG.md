@@ -3,6 +3,9 @@
 
 * Fixed: `Uninstall-CCertificate` and `Install-CCertificate` can fail if the module's default prefix is changed.
 * Fixed: `Get-CCertificate` didn't fail when the user can't open or read a certificate store.
+* Fixed: `Get-CCertificate` fails when a certificate store doesn't exist.
+* Fixed: `Get-CCertificate` doesn't fail when the user is getting a specific certificate in a specific location and
+  store.
 
 
 # 2.1.0

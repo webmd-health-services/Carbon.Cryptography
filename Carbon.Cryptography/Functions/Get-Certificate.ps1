@@ -222,7 +222,8 @@ function Get-Certificate
                     {
                         $ex = $ex.InnerException
                     }
-                    $msg = "Failed to create X509Certificate2 object from file ""$($item.FullName)"": $($ex)"
+                    $msg = "[$($ex.GetType().FullName)] exception creating X509Certificate2 object from file " +
+                           """$($item.FullName)"": $($ex)"
                     Write-Error -Message $msg
                 }
             }
@@ -230,155 +231,208 @@ function Get-Certificate
         return
     }
 
-    if( $PSCmdlet.ParameterSetName -like 'FromCertificateStore*' )
+    $foundCerts = @{}
+    Write-Debug -Message "[$($MyInvocation.MyCommand.Name)]"
+    $locationWildcard = '*'
+    if( $StoreLocation )
     {
-        $foundCerts = @{}
-        Write-Debug -Message "[$($MyInvocation.MyCommand.Name)]"
-        $locationWildcard = '*'
-        if( $StoreLocation )
-        {
-            $locationWildcard = $StoreLocation.ToString()
-        }
-        Write-Debug -Message "  $($locationWildcard)"
+        $locationWildcard = $StoreLocation.ToString()
+    }
 
-        [Security.Cryptography.X509Certificates.StoreLocation] $currentUserLocation =
-            [Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser
-        [Security.Cryptography.X509Certificates.StoreLocation] $localMachineLocation =
-            [Security.Cryptography.X509Certificates.StoreLocation]::LocalMachine
+    $storeNameWildcard = '*'
+    if( $StoreName )
+    {
+        $storeNameWildcard = $StoreName.ToString()
+    }
+    Write-Debug -Message "  $($locationWildcard)\$($storeNameWildcard)"
 
-        @($currentUserLocation, $localMachineLocation) |
-            Where-Object { $_.ToString() -like $locationWildcard } |
-            ForEach-Object {
-                $location = $_
-                Write-Debug -Message "  $($location)"
+    # If we're searching for a certificate, don't write an error if one isn't found. Only write an error if the user
+    # is looking for a specific certificate in a specific location and store.
+    $searching = [Management.Automation.WildcardPattern]::ContainsWildcardCharacters($Thumbprint) -or `
+                 [Management.Automation.WildcardPattern]::ContainsWildcardCharacters($FriendlyName) -or `
+                 [Management.Automation.WildcardPattern]::ContainsWildcardCharacters($Subject) -or `
+                 $locationWildcard -eq '*' -or `
+                 ($storeNameWildcard -eq '*' -and -not $CustomStoreName)
+                 
+    [Security.Cryptography.X509Certificates.StoreLocation] $currentUserLocation =
+        [Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser
+    [Security.Cryptography.X509Certificates.StoreLocation] $localMachineLocation =
+        [Security.Cryptography.X509Certificates.StoreLocation]::LocalMachine
 
-                if( $CustomStoreName )
+    $result = @()
+    @($currentUserLocation, $localMachineLocation) |
+        Where-Object { $_.ToString() -like $locationWildcard } |
+        ForEach-Object {
+            $location = $_
+            Write-Debug -Message "  $($location)"
+
+            if( $CustomStoreName )
+            {
+                try
                 {
+                    Write-Debug -Message "    $($CustomStoreName)"
+                    [Security.Cryptography.X509Certificates.X509Store]::New($CustomStoreName, $location) |
+                        Write-Output
+                }
+                catch
+                {
+                    $msg = "Failed to open ""$($location)\$($CustomStoreName)"" custom store: $($_)"
+                    Write-Error -Message $msg -ErrorAction $ErrorActionPreference
+                }
+                return
+            }
+
+            Write-Debug -Message "    $($storeNameWildcard)"
+
+            [Enum]::GetValues([Security.Cryptography.X509Certificates.StoreName]) |
+                Where-Object { $_.ToString() -like $storeNameWildcard } |
+                ForEach-Object {
+                    $name = $_
                     try
                     {
-                        Write-Debug -Message "    $($CustomStoreName)"
-                        [Security.Cryptography.X509Certificates.X509Store]::New($CustomStoreName, $location) |
+                        [Security.Cryptography.X509Certificates.X509Store]::New($name, $location) |
                             Write-Output
                     }
                     catch
                     {
-                        $msg = "Failed to open ""$($location)"" ""$($CustomStoreName)"" store: $($_)"
+                        $ex = $_.Exception
+                        while( $ex.InnerException )
+                        {
+                            $ex = $ex.InnerException
+                        }
+                        $msg = "Exception opening ""$($location)\$($name)"" store: " +
+                               "[$($ex.GetType().FullName)]: $($ex)"
                         Write-Error -Message $msg -ErrorAction $ErrorActionPreference
                     }
-                    return
                 }
+        } |
+        Foreach-Object {
+            $openFlags = [Security.Cryptography.X509Certificates.OpenFlags]::OpenExistingOnly -bor `
+                         [Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly
 
-                $storeNameWildcard = '*'
-                if( $StoreName )
+            [Security.Cryptography.X509Certificates.X509Store] $store = $_
+            try
+            {
+                $store.Open($openFlags)
+                $storeNamePropValue = $store.Name
+                if( -not $CustomStoreName )
                 {
-                    $storeNameWildcard = $StoreName.ToString()
-                }
-                Write-Debug -Message "    $($storeNameWildcard)"
-
-                [Enum]::GetValues([Security.Cryptography.X509Certificates.StoreName]) |
-                    Where-Object { $_.ToString() -like $storeNameWildcard } |
-                    ForEach-Object {
-                        $name = $_
-                        try
-                        {
-                            [Security.Cryptography.X509Certificates.X509Store]::New($name, $location) |
-                                Write-Output
-                        }
-                        catch
-                        {
-                            $msg = "Exception opening ""$($location)"" ""$($name)"" store: $($_)"
-                            Write-Debug -Message $msg
-                        }
-                    }
-            } |
-            Foreach-Object {
-                $openFlags = [Security.Cryptography.X509Certificates.OpenFlags]::OpenExistingOnly -bor `
-                             [Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly
-
-                [Security.Cryptography.X509Certificates.X509Store] $store = $_
-                try
-                {
-                    $store.Open($openFlags)
-                    $storeNamePropValue = $store.Name
-                    if( -not $CustomStoreName )
+                    if( $storeNamePropValue -eq 'CA' )
                     {
-                        if( $storeNamePropValue -eq 'CA' )
-                        {
-                            $storeNamePropValue = [Security.Cryptography.X509Certificates.StoreName]::CertificateAuthority
-                        }
-                        else
-                        {
-                            $storeNamePropValue = [Security.Cryptography.X509Certificates.StoreName]$storeNamePropValue
-                        }
+                        $storeNamePropValue = [Security.Cryptography.X509Certificates.StoreName]::CertificateAuthority
                     }
-                    Write-Debug "      $($store.Location)  $($store.Name)"
-                    $store.Certificates |
-                        Add-Member -MemberType NoteProperty -Name 'StoreLocation' -Value $store.Location -PassThru |
-                        Add-Member -MemberType NoteProperty -Name 'StoreName' -Value $storeNamePropValue -PassThru |
-                        Add-Member -MemberType ScriptProperty -Name 'Path' -Value {
-                            if( -not (Test-Path -Path 'cert:') )
-                            {
-                                return
-                            }
+                    else
+                    {
+                        $storeNamePropValue = [Security.Cryptography.X509Certificates.StoreName]$storeNamePropValue
+                    }
+                }
+                Write-Debug "      $($store.Location)  $($store.Name)"
+                $store.Certificates |
+                    Add-Member -MemberType NoteProperty -Name 'StoreLocation' -Value $store.Location -PassThru |
+                    Add-Member -MemberType NoteProperty -Name 'StoreName' -Value $storeNamePropValue -PassThru |
+                    Add-Member -MemberType ScriptProperty -Name 'Path' -Value {
+                        if( -not (Test-Path -Path 'cert:') )
+                        {
+                            return
+                        }
 
-                            $storeNamePath = $this.StoreName
-                            if( $storeNamePath.ToString() -eq 'CertificateAuthority' )
-                            {
-                                $storeNamePath = 'CA'
-                            }
+                        $storeNamePath = $this.StoreName
+                        if( $storeNamePath.ToString() -eq 'CertificateAuthority' )
+                        {
+                            $storeNamePath = 'CA'
+                        }
 
-                            $path = Join-Path -Path 'cert:' -ChildPath $this.StoreLocation
-                            $path = Join-Path -Path $path -ChildPath $storeNamePath
-                            $path = Join-Path -Path $path -ChildPath $this.Thumbprint
-                            return $path
-                        } -PassThru
-                }
-                catch
+                        $path = Join-Path -Path 'cert:' -ChildPath $this.StoreLocation
+                        $path = Join-Path -Path $path -ChildPath $storeNamePath
+                        $path = Join-Path -Path $path -ChildPath $this.Thumbprint
+                        return $path
+                    } -PassThru
+            }
+            # Store doesn't exist.
+            catch [Security.Cryptography.CryptographicException]
+            {
+                $Global:Error.RemoveAt(0)
+            }
+            catch
+            {
+                $ex = $_.Exception
+                while( $ex.InnerException )
                 {
-                    $msg = "Exception opening and iterating certificates in ""$($store.Location)\$($store.Name)"" " +
-                           "store: $($_)"
-                    Write-Error -Message $msg -ErrorAction $ErrorActionPreference
+                    $ex = $ex.InnerException
                 }
-                finally
-                {
-                    $store.Dispose()
-                }
-            } |
-            Where-Object {
-                $key = "$($_.StoreLocation)\$($_.StoreName)\$($_.Thumbprint)"
-                if( $foundCerts.ContainsKey($key) )
-                {
-                    return $false
-                }
-                $foundCerts[$key] = $_
+                $msg = "[$($ex.GetType().FullName)] exception opening and iterating certificates in " +
+                       """$($store.Location)\$($store.Name)"" store: $($ex)"
+                Write-Error -Message $msg -ErrorAction $ErrorActionPreference
+            }
+            finally
+            {
+                $store.Dispose()
+            }
+        } |
+        Where-Object {
+            $key = "$($_.StoreLocation)\$($_.StoreName)\$($_.Thumbprint)"
+            if( $foundCerts.ContainsKey($key) )
+            {
+                return $false
+            }
+            $foundCerts[$key] = $_
+            return $true
+        } |
+        Where-Object {
+            if( -not $Thumbprint )
+            {
                 return $true
-            } |
-            Where-Object {
-                if( -not $Thumbprint )
-                {
-                    return $true
-                }
-                return $_.Thumbprint -like $Thumbprint
-            } |
-            Where-Object {
-                if( -not $FriendlyName )
-                {
-                    return $true
-                }
-                return $_.FriendlyName -like $FriendlyName
-            } |
-            Where-Object {
-                if( -not $Subject )
-                {
-                    return $true
-                }
-                return $_.Subject -like $Subject
-            } |
-            ForEach-Object { $_.pstypenames.Insert(0, 'Carbon.Cryptography.X509Certificate2') ; $_ } |
-            Write-Output
-        return
-    }
+            }
+            return $_.Thumbprint -like $Thumbprint
+        } |
+        Where-Object {
+            if( -not $FriendlyName )
+            {
+                return $true
+            }
+            return $_.FriendlyName -like $FriendlyName
+        } |
+        Where-Object {
+            if( -not $Subject )
+            {
+                return $true
+            }
+            return $_.Subject -like $Subject
+        } |
+        ForEach-Object { $_.pstypenames.Insert(0, 'Carbon.Cryptography.X509Certificate2') ; $_ } |
+        Tee-Object -Variable 'result' |
+        Write-Output
 
-    Write-Error "Unknown parameter set '$($pscmdlet.ParameterSetName)'."
+    if( -not $searching -and -not $result )
+    {
+        if( $Thumbprint )
+        {
+            $fieldName = 'thumbprint'
+            $fieldValue = $Thumbprint
+        }
+        elseif( $FriendlyName )
+        {
+            $fieldName = 'friendly name'
+            $fieldValue = $FriendlyName
+        }
+        elseif( $Subject )
+        {
+            $fieldName = 'subject'
+            $fieldValue = 'Subject'
+        }
+
+        if( $StoreName )
+        {
+            $storeDisplayName = $StoreName.ToString()
+        }
+        elseif( $CustomStoreName )
+        {
+            $storeDisplayName = "$($CustomStoreName) custom"
+        }
+
+        $msg = "Certificate with $($fieldName) ""$($fieldValue)"" does not exist in the $($StoreLocation)\" +
+               "$($storeDisplayName) store."
+        Write-Error -Message $msg -ErrorAction $ErrorActionPreference
+    }
 }
 
