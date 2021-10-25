@@ -11,9 +11,8 @@ image:
 - Visual Studio 2015
 - Visual Studio 2017
 - Visual Studio 2019
-- Ubuntu
+- Ubuntu # Ubuntu and Ubuntu1804 are the same
 - Ubuntu2004
-- Ubuntu1804
 - Ubuntu1604
 - macOS
 - macOS-BigSur
