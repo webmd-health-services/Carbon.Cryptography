@@ -13,19 +13,23 @@ function Get-Certificate
     the flags to the `KeyStorageFlags` parameter.
 
     On Windows, the path can also be a path to a certificate in PowerShell's certificate drive (i.e. the path begins
-    with `cert:\`), the `Password` and `KeyStorageFlags` are ignored. The certificate is returned. Wildcards allowed.
+    with `cert:\`). When getting a path in the `cert:` drive, the `Password` and `KeyStorageFlags` parameters are
+    ignored. The certificate is returned. Wildcards allowed.
 
     When called with no parameters, `Get-CCertificate` returns all certificates in all certificate locations and stores
-    (except stores with custom name). You can filter what certificates to return using any combination of these
+    (except stores with custom names). You can filter what certificates to return using any combination of these
     parameters. A certificate must match all filters to be returned.
 
     * `StoreLocation`: only return certificates in one of the store locations, `CurrentUser` or `LocalMachine`.
     * `StoreName`: only return certificates from this store. Can't be used with `CustomStoreName`.
     * `CustomStoreName`: only return certificates from this custom store name. Can't be used with `StoreName`.
+    * `Subject`: only return certificates with this subject. Wildcards allowed.
+    * `LiteralSubject`: only return certificates with this exact subject.
     * `Thumbprint`: only return certificates with this thumbprint. Wildcards allowed.
     * `FriendlyName`: only return certificates with this friendly name. Wildcards allowed. Friendly names are
       Windows-only. If you pass a friendly name on other platforms, you'll get no certificates back.
-    * `Subject`: only return certificates with this subject. Wildcards allowed.
+    * `LiteralFriendlyName`: only return certificates with this exact friendly name. Friendly names are Windows-only. If
+      you pass a friendly name on other platforms, you'll get no certificates back.
 
     `Get-CCertificate` adds a `Path` property to the returned objects that is the file system path where the certificate
     was loaded from, or, if loaded from a Windows certificate store, the path to the certificate in the `cert:` drive.
@@ -69,21 +73,31 @@ function Get-Certificate
     Demonstrates how to get all certificates from a specific store.
 
     .EXAMPLE
-    Get-CCertificate -FriendlyName 'My Friendly Name'
-
-    Demonstrates how to get all certificates with a specific friendly name. Friendly names are Windows-only. No
-    certificates will be returned when using this parameter on non-Windows platforms.
-
-    .EXAMPLE
     Get-CCertificate -Subject 'CN=Carbon.Cryptography'
 
     Demonstrates how to find all certificates in all stores that have a specific subject.
+
+    .EXAMPLE
+    Get-CCertificate -LiteralSubject 'CN=*.example.com'
+
+    Demonstrates how to find a certificate that has wildcards in its subject using the `LiteralSubject` parameter.
 
     .EXAMPLE
     Get-CCertificate -Thumbprint $thumbprint -CustomStoreName 'SharePoint' -StoreLocation LocalMachine
 
     Demonstrates how to get a certificate from a custom store, i.e. one that is not part of the standard `StoreName`
     enumeration.
+
+    .EXAMPLE
+    Get-CCertificate -FriendlyName 'My Friendly Name'
+
+    Demonstrates how to get all certificates with a specific friendly name. Friendly names are Windows-only. No
+    certificates will be returned when using this parameter on non-Windows platforms.
+
+    .EXAMPLE
+    Get-CCertificate -LiteralFriendlyName '*My Friendly Name'
+
+    Demonstrates how to find a certificate that has wildcards in its subject using the `LiteralFriendlyName` parameter.
 
     .EXAMPLE
     Get-CCertificate -Path 'cert:\CurrentUser\a909502dd82ae41433e6f83886b00d4277a32a7b'
@@ -114,16 +128,27 @@ function Get-Certificate
         [Parameter(ParameterSetName='FromCertificateStoreCustomStore')]
         [String] $Thumbprint,
 
+        # The subject of the certificate. Wildcards allowed.
+        [Parameter(ParameterSetName='FromCertificateStore')]
+        [Parameter(ParameterSetName='FromCertificateStoreCustomStore')]
+        [String] $Subject,
+
+        # The literal subject of the certificate.
+        [Parameter(ParameterSetName='FromCertificateStore')]
+        [Parameter(ParameterSetName='FromCertificateStoreCustomStore')]
+        [String] $LiteralSubject,
+
         # The friendly name of the certificate. Wildcards allowed. Friendly name is Windows-only. If you search by
         # friendly name on other platforms, you'll never get any certificates back.
         [Parameter(ParameterSetName='FromCertificateStore')]
         [Parameter(ParameterSetName='FromCertificateStoreCustomStore')]
         [String] $FriendlyName,
 
-        # The subject of the certificate. Wildcards allowed.
+        # The literal friendly name of the certificate. Friendly name is Windows-only. If you search by friendly name on
+        # other platforms, you'll never get any certificates back.
         [Parameter(ParameterSetName='FromCertificateStore')]
         [Parameter(ParameterSetName='FromCertificateStoreCustomStore')]
-        [String] $Subject,
+        [String] $LiteralFriendlyName,
 
         # The location of the certificate's store.
         [Parameter(ParameterSetName='FromCertificateStore')]
@@ -184,7 +209,7 @@ function Get-Certificate
     {
         if( -not (Test-Path -Path $Path -PathType Leaf) )
         {
-            Write-Error -Message "Certificate ""$($Path)"" not found."
+            Write-Error -Message "Certificate ""$($Path)"" not found." -ErrorAction $ErrorActionPreference
             return
         }
 
@@ -224,7 +249,7 @@ function Get-Certificate
                     }
                     $msg = "[$($ex.GetType().FullName)] exception creating X509Certificate2 object from file " +
                            """$($item.FullName)"": $($ex)"
-                    Write-Error -Message $msg
+                    Write-Error -Message $msg -ErrorAction $ErrorActionPreference
                 }
             }
         }
@@ -379,6 +404,21 @@ function Get-Certificate
             return $true
         } |
         Where-Object {
+            if( -not $Subject )
+            {
+                return $true
+            }
+            return $_.Subject -like $Subject
+        } |
+        Where-Object {
+            if( -not $LiteralSubject )
+            {
+                return $true
+            }
+
+            return $_.Subject -eq $LiteralSubject
+        } |
+        Where-Object {
             if( -not $Thumbprint )
             {
                 return $true
@@ -393,11 +433,11 @@ function Get-Certificate
             return $_.FriendlyName -like $FriendlyName
         } |
         Where-Object {
-            if( -not $Subject )
+            if( -not $LiteralFriendlyName )
             {
                 return $true
             }
-            return $_.Subject -like $Subject
+            return $_.FriendlyName -eq $LiteralFriendlyName
         } |
         ForEach-Object { $_.pstypenames.Insert(0, 'Carbon.Cryptography.X509Certificate2') ; $_ } |
         Tee-Object -Variable 'result' |
@@ -405,20 +445,35 @@ function Get-Certificate
 
     if( -not $searching -and -not $result )
     {
+        $fields = [Collections.ArrayList]::New()
+        if( $Subject )
+        {
+            $field = "Subject like ""$($Subject)"""
+            [void]$fields.Add($field)
+        }
+
+        if( $LiteralSubject )
+        {
+            $field = "Subject equal ""$($LiteralSubject)"""
+            [void]$fields.Add($field)
+        }
+
         if( $Thumbprint )
         {
-            $fieldName = 'thumbprint'
-            $fieldValue = $Thumbprint
+            $field = "Thumbprint like ""$($Thumbprint)"""
+            [void]$fields.Add($field)
         }
-        elseif( $FriendlyName )
+
+        if( $FriendlyName )
         {
-            $fieldName = 'friendly name'
-            $fieldValue = $FriendlyName
+            $field = "Friendly Name like ""$($FriendlyName)"""
+            [void]$fields.Add($field)
         }
-        elseif( $Subject )
+
+        if( $LiteralFriendlyName )
         {
-            $fieldName = 'subject'
-            $fieldValue = 'Subject'
+            $field = "Friendly Name equal ""$($LiteralFriendlyName)"""
+            [void]$fields.Add($field)
         }
 
         if( $StoreName )
@@ -430,7 +485,14 @@ function Get-Certificate
             $storeDisplayName = "$($CustomStoreName) custom"
         }
 
-        $msg = "Certificate with $($fieldName) ""$($fieldValue)"" does not exist in the $($StoreLocation)\" +
+        $lastField = ''
+        if( $fields.Count -gt 1 )
+        {
+            $lastField = ", and $($fields[-1])"
+            $fields = $fields[0..($fields.Count - 2)]
+        }
+
+        $msg = "Certificate with $($fields -join ', ')$($lastField) does not exist in the $($StoreLocation)\" +
                "$($storeDisplayName) store."
         Write-Error -Message $msg -ErrorAction $ErrorActionPreference
     }
