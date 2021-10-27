@@ -17,7 +17,7 @@
     RootModule = 'Carbon.Cryptography.psm1'
 
     # Version number of this module.
-    ModuleVersion = '2.1.0'
+    ModuleVersion = '2.2.0'
 
     # ID used to uniquely identify this module
     GUID = '225b9f63-3e3e-406c-87a0-33d34f30cd8e'

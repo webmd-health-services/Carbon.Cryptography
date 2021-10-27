@@ -46,12 +46,25 @@ function Test-CustomStore
 {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName='IsSupported')]
         [switch] $IsSupported,
+
+        [Parameter(Mandatory, ParameterSetName='IsReadOnly')]
+        [switch] $IsReadOnly,
 
         [Parameter(Mandatory)]
         [Security.Cryptography.X509Certificates.StoreLocation] $Location
     )
+
+    if( $IsReadOnly )
+    {
+        if( (Test-TCOperatingSystem -Windows) -and -not (Test-IsAdministrator) )
+        {
+            return $true
+        }
+
+        return $false
+    }
 
     if( (Test-TCOperatingSystem -Windows) )
     {
@@ -59,6 +72,16 @@ function Test-CustomStore
     }
 
     return $Location -eq [Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser
+}
+
+function Test-FriendlyName
+{
+    param(
+        [Parameter(Mandatory)]
+        [switch] $IsSupported
+    )
+
+    return (Test-TCOperatingSystem -IsWindows)
 }
 
 # When the Carbon.Accounts PowerShell module gets created, use the Test-CAdminPrivilege from that module instead.

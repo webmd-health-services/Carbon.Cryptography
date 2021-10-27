@@ -28,7 +28,7 @@ function ThenFailed
 
     if( $WithErrorMatching )
     {
-        $Global:Error | Should -Match $WithErrorMatching
+        $Global:Error[0] | Should -Match $WithErrorMatching
     }
 }
 
@@ -37,7 +37,10 @@ Describe 'Uninstall-Certificate' {
     It 'should remove certificate by certificate' {
         Init
         Uninstall-CCertificate -Certificate $TestCert -StoreLocation CurrentUser -StoreName My
-        $cert = Get-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -StoreName My
+        $cert = Get-CCertificate -Thumbprint $TestCert.Thumbprint `
+                                 -StoreLocation CurrentUser `
+                                 -StoreName My `
+                                 -ErrorAction Ignore
         $cert | Should -BeNullOrEmpty
     }
 
@@ -48,7 +51,10 @@ Describe 'Uninstall-Certificate' {
         $tryNum = 0
         do
         {
-            $cert = Get-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -StoreName My
+            $cert = Get-CCertificate -Thumbprint $TestCert.Thumbprint `
+                                     -StoreLocation CurrentUser `
+                                     -StoreName My `
+                                     -ErrorAction Ignore
             if( -not $cert )
             {
                 break
@@ -62,14 +68,18 @@ Describe 'Uninstall-Certificate' {
     It 'should support WhatIf' {
         Init
         Uninstall-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -StoreName My -WhatIf
-        $cert = Get-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -StoreName My
+        $cert = Get-CCertificate -Thumbprint $TestCert.Thumbprint `
+                                 -StoreLocation CurrentUser `
+                                 -StoreName My `
+                                 -ErrorAction Ignore
         $cert | Should -Not -BeNullOrEmpty
     }
 
     It 'should uninstall certificate from custom store' {
         Init
         $errorActionParam = @{}
-        if( -not (Test-CustomStore -IsSupported -Location CurrentUser) )
+        if( -not (Test-CustomStore -IsSupported -Location CurrentUser) -or `
+            (Test-CustomStore -IsReadOnly -Location CurrentUser) )
         {
             $errorActionParam['ErrorAction'] = 'SilentlyContinue'
         }
@@ -80,21 +90,34 @@ Describe 'Uninstall-Certificate' {
         }
         $cert = Install-CCertificate -Path $TestCertPath -StoreLocation CurrentUser -CustomStoreName 'Carbon' -PassThru
         $cert | Should -Not -BeNullOrEmpty
-        Get-CCertificate -StoreLocation CurrentUser -CustomStoreName 'Carbon' -Thumbprint $cert.Thumbprint |
+        Get-CCertificate -Thumbprint $TestCert.Thumbprint `
+                         -StoreLocation CurrentUser `
+                         -CustomStoreName 'Carbon' `
+                         -ErrorAction Ignore |
             Should -Not -BeNullOrEmpty
         Uninstall-CCertificate -Thumbprint $cert.Thumbprint `
                                -StoreLocation CurrentUser `
                                -CustomStoreName 'Carbon' `
                                @errorActionParam
-        if( (Test-CustomStore -IsSupported -Location CurrentUser) )
+        if( (Test-CustomStore -IsReadOnly -Location CurrentUser) )
         {
-            while( (Get-CCertificate -StoreLocation CurrentUser -CustomStoreName 'Carbon' -Thumbprint $cert.Thumbprint) )
+            ThenFailed -WithErrorMatching 'exception uninstalling certificate'
+        }
+        elseif( (Test-CustomStore -IsSupported -Location CurrentUser) )
+        {
+            while( (Get-CCertificate -StoreLocation CurrentUser `
+                                     -CustomStoreName 'Carbon' `
+                                     -Thumbprint $cert.Thumbprint `
+                                     -ErrorAction Ignore) )
             {
-                Write-Verbose -Message ('Waiting for "{0}" to get deleted.' -f $certPath)
+                Write-Verbose -Message ('Waiting for "CurrentUser\Carbon" to get deleted.')
                 Start-Sleep -Seconds 1
             }
-            Get-CCertificate -StoreLocation CurrentUser -CustomStoreName 'Carbon' -Thumbprint $cert.Thumbprint |
-                Should -BeNullOrEmpty    
+            Get-CCertificate -StoreLocation CurrentUser `
+                             -CustomStoreName 'Carbon' `
+                             -Thumbprint $cert.Thumbprint `
+                             -ErrorAction Ignore |
+                Should -BeNullOrEmpty
         }
         else
         {
@@ -117,7 +140,10 @@ Describe 'Uninstall-Certificate' {
                                    -Session $session
             $Global:Error.Count | Should -Be 0
 
-            $cert = Get-CCertificate -Thumbprint $TestCert.Thumbprint -StoreLocation CurrentUser -StoreName My
+            $cert = Get-CCertificate -Thumbprint $TestCert.Thumbprint `
+                                     -StoreLocation CurrentUser `
+                                     -StoreName My `
+                                     -ErrorAction Ignore
             $cert | Should -BeNullOrEmpty
         }
         finally

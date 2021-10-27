@@ -115,14 +115,14 @@ function Uninstall-Certificate
             # the CurrentUser store first, you'll get errors when running non-
             # interactively as SYSTEM.
             $certsToDelete = & {
-                Get-CCertificate -StoreLocation LocalMachine -Thumbprint $Thumbprint
-                Get-CCertificate -StoreLocation CurrentUser -Thumbprint $Thumbprint
+                Get-Certificate -StoreLocation LocalMachine -Thumbprint $Thumbprint
+                Get-Certificate -StoreLocation CurrentUser -Thumbprint $Thumbprint
             }
             foreach( $certToDelete in $certsToDelete )
             {
-                Uninstall-CCertificate -Thumbprint $Thumbprint `
-                                       -StoreLocation $certToDelete.StoreLocation `
-                                       -StoreName $certToDelete.StoreName
+                Uninstall-Certificate -Thumbprint $Thumbprint `
+                                      -StoreLocation $certToDelete.StoreLocation `
+                                      -StoreName $certToDelete.StoreName
             }
             return
         }
@@ -186,7 +186,13 @@ function Uninstall-Certificate
             }
             catch
             {
-                $msg = "Exception reading certificates from $($StoreLocation)\$($storeNameDisplay) store: $($_)"
+                $ex = $_.Exception.InnerException
+                while( $ex.InnerException )
+                {
+                    $ex = $ex.InnerException
+                }
+                $msg = "[$($ex.GetType().FullName)] exception reading certificates from $($StoreLocation)\" +
+                       "$($storeNameDisplay) store: $($ex)"
                 Write-Error -Message $msg -ErrorAction $ErrorActionPreference
                 return
             }
@@ -215,7 +221,13 @@ function Uninstall-Certificate
             }
             catch
             {
-                $msg = "Exception uninstalling certificate in $($StoreLocation)\$($storeNameDisplay) store: $($_)"
+                $ex = $_.Exception.InnerException
+                while( $ex.InnerException )
+                {
+                    $ex = $ex.InnerException
+                }
+                $msg = "[$($ex.GetType().FullName)] exception uninstalling certificate in $($StoreLocation)\" +
+                       "$($storeNameDisplay) store: $($ex)"
                 Write-Error -Message $msg -ErrorAction $ErrorActionPreference
                 return
             }
