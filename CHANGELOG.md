@@ -1,4 +1,10 @@
 
+# 2.2.1
+
+* Fixed: `Install-CCertificate` fails when loading a certificate from a file and when adding a certificate to a store.
+* Fixed: `Get-CCertificate` fails when using the `KeyStorageFlags` parameter.
+
+
 # 2.2.0
 
 * Fixed: `Uninstall-CCertificate` and `Install-CCertificate` can fail if the module's default prefix is changed.

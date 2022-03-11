@@ -114,7 +114,7 @@ function Install-Certificate
         $fileBytes = [IO.File]::ReadAllBytes($Path)
         $encodedCert = [Convert]::ToBase64String($fileBytes)
         $keyFlags = $ephemeralKeyFlag
-        if( (Test-TCOperatingSystem -MacOS) )
+        if( (Test-COperatingSystem -MacOS) )
         {
             $keyFlags = $defaultKeyFlag
         }
@@ -271,7 +271,7 @@ function Install-Certificate
         }
         catch
         {
-            if( (Test-TCOperatingSystem -MacOS) -and ($cert.HasPrivateKey -and -not $Exportable) )
+            if( (Test-COperatingSystem -MacOS) -and ($cert.HasPrivateKey -and -not $Exportable) )
             {
                 $msg = "Exception installing certificate ""$($description)"" ($($cert.Thumbprint)) into " +
                        "$($StoreLocation)\$($storeNameDisplay): $($_). On macOS, certificates with private keys " +
