@@ -248,8 +248,9 @@ Describe 'Protect-String.when encryption fails' {
                 Protect-CString -String $plainText -PublicKeyPath $publicKeyFilePath -ErrorAction SilentlyContinue |
                     Should -BeNullOrEmpty
                 # Different error message on different versions of .NET and different platforms
-                #                              WinPS 5.1 | PS Core 7            | Linux        | macOS
-                $Global:Error | Should -Match 'Bad Length|parameter is incorrect|data too large|message exceeds the maximum'
+                #         WinPS 5.1 | PS Core 7            | Linux        | macOS                     | macOS
+                $regex = 'Bad Length|parameter is incorrect|data too large|message exceeds the maximum|wrong input size'
+                $Global:Error | Should -Match $regex
             } |
                 Should -Not -Throw
         }

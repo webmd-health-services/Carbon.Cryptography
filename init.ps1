@@ -21,6 +21,8 @@ Set-StrictMode -Version 'Latest'
 $ErrorActionPreference = 'Stop'
 $InformationPreference = 'Continue'
 
+prism install -Recurse
+
 & {
     Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'PSModules\Carbon' -Resolve) `
                   -Verbose:$false `
@@ -35,14 +37,19 @@ if( -not (Test-Path -Path $passwordPath) )
 {
     $rng = [Security.Cryptography.RNGCryptoServiceProvider]::New()
     $randomBytes = [byte[]]::New(12)
+    Write-Verbose "Passwords" -Verbose
     do 
     {
         Write-Verbose -Message ('Generating random password for test accounts.')
         $rng.GetBytes($randomBytes);
         $password = [Convert]::ToBase64String($randomBytes)
+        Write-Verbose "  $($password)" -Verbose
     }
     # Password needs to contain uppercase letter, lowercase letter, and a number.
-    while( $password -cnotmatch '[A-Z]' -and $password -cnotmatch '[a-z]' -and $password -notmatch '\d' -and $password -notmatch '\+|\/' )
+    while( $password -cnotmatch '[A-Z]' -and `
+           $password -cnotmatch '[a-z]' -and `
+           $password -notmatch '\d' -and `
+           $password -notmatch '\+|\/' )
     $password | Set-Content -Path $passwordPath
 
     Write-Verbose -Message ('Generating IV for encrypting test account password on Linux.')
