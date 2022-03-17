@@ -34,7 +34,7 @@ if( (Get-Module -Name 'Carbon') )
 }
 
 Import-Module -Name 'Microsoft.PowerShell.Security'
-Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\PSModules\Carbon.Core' -Resolve) `
+Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\Carbon.Cryptography\PSModules\Carbon.Core' -Resolve) `
               -Prefix 'T' `
               -Force
 

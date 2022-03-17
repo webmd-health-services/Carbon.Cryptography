@@ -25,7 +25,7 @@ $InformationPreference = 'Continue'
     Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'PSModules\Carbon' -Resolve) `
                   -Verbose:$false `
                   -Function @('Install-CUser', 'Grant-CPermission')
-    Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'PSModules\Carbon.Core' -Resolve) `
+    Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'Carbon.Cryptography\PSModules\Carbon.Core' -Resolve) `
                   -Verbose:$false `
                   -Function @('Test-COperatingSystem', 'Invoke-CPowerShell')
 }

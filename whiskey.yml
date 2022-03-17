@@ -28,13 +28,12 @@ Build:
     - CHANGELOG.md
     DestinationDirectory: Carbon.Cryptography
 
-- GetPowerShellModule:
-    Name: Carbon
-    Version: 2.*
+- PowerShell:
+    ScriptBlock: prism install -Recurse
 
-- GetPowerShellModule:
-    Name: Carbon.Core
-    Version: 1.*
+- Delete:
+    OnlyBy: BuildServer
+    Path: Carbon.Cryptography\prism.*
 
 - PowerShell:
     ExceptDuring: Clean
@@ -43,11 +42,6 @@ Build:
 - PowerShell:
     OnlyDuring: Clean
     Path: reset.ps1
-
-- GetPowerShellModule:
-    Name: Carbon.Core
-    Version: 1.0.0
-    Path: Carbon.Cryptography\Modules
 
 - Pester4:
     Script: Tests\*.Tests.ps1
