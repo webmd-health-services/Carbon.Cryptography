@@ -229,7 +229,7 @@ function Get-Certificate
                     if( $PSBoundParameters.ContainsKey('KeyStorageFlags') )
                     {
                         # macOS doesn't allow ephemeral key storage, which is kind of weird but whatever.
-                        if( (Test-TCOperatingSystem -MacOS) )
+                        if( (Test-COperatingSystem -MacOS) )
                         {
                             $KeyStorageFlags = 
                                 $KeyStorageFlags -band -bnot [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet

@@ -315,11 +315,11 @@ foreach( $location in @('CurrentUser', 'LocalMachine') )
             Init
             $fileCount = Measure-PhysicalStore -Location $location
             WhenInstalling -FromFile $TestCertProtectedPath `
-                        -WithPassword $password `
-                        -For $location `
-                        -In 'My' `
-                        -ThatIsExportable:(Test-TCertificate -MustBeExportable) `
-                        @errorActionParam
+                           -WithPassword $password `
+                           -For $location `
+                           -In 'My' `
+                           -ThatIsExportable:(Test-TCertificate -MustBeExportable) `
+                           @errorActionParam
             if( -not $hasMyStore )
             {
                 ThenFailed 'Exception reading certificates'

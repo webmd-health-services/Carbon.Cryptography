@@ -1,0 +1,8 @@
+{
+    "PSModules": [
+        {
+            "Name": "Carbon.Core",
+            "Version": "1.*"
+        }
+    ]
+}

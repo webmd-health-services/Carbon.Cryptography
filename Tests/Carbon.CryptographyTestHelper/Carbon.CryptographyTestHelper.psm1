@@ -166,7 +166,7 @@ function Test-Remoting
 
 function Test-RunningUnderBuildServer
 {
-    return (Test-Path -Path 'env:CARBON_CI')
+    return (Test-Path -Path 'env:WHS_CI')
 }
 
 if( (Test-Remoting -IsAvailable) -and (Get-Command -Name 'Get-Service' -ErrorAction Ignore) )

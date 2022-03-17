@@ -21,11 +21,13 @@ Set-StrictMode -Version 'Latest'
 $ErrorActionPreference = 'Stop'
 $InformationPreference = 'Continue'
 
+prism install -Recurse
+
 & {
     Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'PSModules\Carbon' -Resolve) `
                   -Verbose:$false `
                   -Function @('Install-CUser', 'Grant-CPermission')
-    Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'PSModules\Carbon.Core' -Resolve) `
+    Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'Carbon.Cryptography\PSModules\Carbon.Core' -Resolve) `
                   -Verbose:$false `
                   -Function @('Test-COperatingSystem', 'Invoke-CPowerShell')
 }
@@ -33,16 +35,19 @@ $InformationPreference = 'Continue'
 $passwordPath = Join-Path -Path $PSScriptRoot -ChildPath 'Tests\.password'
 if( -not (Test-Path -Path $passwordPath) )
 {
+    Write-Verbose -Message ('Generating random password for test accounts.')
     $rng = [Security.Cryptography.RNGCryptoServiceProvider]::New()
     $randomBytes = [byte[]]::New(12)
     do 
     {
-        Write-Verbose -Message ('Generating random password for test accounts.')
         $rng.GetBytes($randomBytes);
         $password = [Convert]::ToBase64String($randomBytes)
     }
-    # Password needs to contain uppercase letter, lowercase letter, and a number.
-    while( $password -cnotmatch '[A-Z]' -and $password -cnotmatch '[a-z]' -and $password -notmatch '\d' -and $password -notmatch '\+|\/' )
+    # Password needs to contain uppercase letter, lowercase letter, a number, and symbol.
+    while( -not ($password -cmatch '[A-Z]' -and `
+                 $password -cmatch '[a-z]' -and `
+                 $password -match '\d' -and `
+                 $password -match '=|\+|\/') )
     $password | Set-Content -Path $passwordPath
 
     Write-Verbose -Message ('Generating IV for encrypting test account password on Linux.')

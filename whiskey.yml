@@ -1,11 +1,16 @@
 
-PublishOn:
-- main
-- prerelease
-
 Build:
 - Version:
     Path: Carbon.Cryptography\Carbon.Cryptography.psd1
+    Prerelease:
+    - "*/*": alpha$(WHISKEY_BUILD_NUMBER)
+    - develop: rc$(WHISKEY_BUILD_NUMBER)
+
+# Update the AppVeyor build/version number.
+- Exec:
+      OnlyBy: BuildServer
+      Path: appveyor
+      Argument: [ UpdateBuild, -Version, $(WHISKEY_SEMVER2) ]
 
 # Dot-sourcing files is expensive. Move all functions into .psm1 file to improve import speed. Do this before testing
 # to ensure the module still works.
@@ -19,23 +24,6 @@ Build:
     DeleteSourceFiles: true
     TextSeparator: "$(NewLine)$(NewLine)"
 
-- CopyFile:
-    IfExists: env:CARBON_CI
-    Path:
-    - LICENSE
-    - NOTICE
-    - README.md
-    - CHANGELOG.md
-    DestinationDirectory: Carbon.Cryptography
-
-- GetPowerShellModule:
-    Name: Carbon
-    Version: 2.*
-
-- GetPowerShellModule:
-    Name: Carbon.Core
-    Version: 1.*
-
 - PowerShell:
     ExceptDuring: Clean
     Path: init.ps1
@@ -44,55 +32,44 @@ Build:
     OnlyDuring: Clean
     Path: reset.ps1
 
-- GetPowerShellModule:
-    Name: Carbon.Core
-    Version: 1.0.0
-    Path: Carbon.Cryptography\Modules
+- Delete:
+    OnlyBy: BuildServer
+    Path: Carbon.Cryptography\prism.*
+
+- CopyFile:
+    Path:
+    - CHANGELOG.md
+    - README.md
+    - LICENSE
+    - NOTICE
+    DestinationDirectory: Carbon.Cryptography
+
+- Zip:
+    ArchivePath: .output\Carbon.Cryptography-$(WHISKEY_SEMVER2).zip
+    Path: 
+    - Carbon.Cryptography
+    Exclude:
+    - "*.pdb"
+    - "*.orig"
+    - "prism.*"
+
+- Exec:
+    OnlyBy: BuildServer
+    Path: appveyor
+    Argument: [ 'PushArtifact', '.output/Carbon.Cryptography-$(WHISKEY_SEMVER2).zip', '-DeploymentName', 'GitHub' ]
+
+- PublishPowerShellModule:
+    Path: Carbon.Cryptography
+
+- Exec:
+    OnlyBy: BuildServer
+    Path: appveyor
+    Argument: [
+        'PushArtifact',
+        '.output/Carbon.Cryptography.$(WHISKEY_SEMVER2_NO_BUILD_METADATA).nupkg',
+        '-DeploymentName',
+        'PowerShellGallery'
+    ]
 
 - Pester4:
     Script: Tests\*.Tests.ps1
-
-# Build runs twice on some servers, so delete any ZIP file created by another build.
-- Delete:
-    Path: .output\*.zip
-
-- Zip:
-    ArchivePath: .output\Carbon.Cryptography.zip
-    Path: 
-    - Carbon.Cryptography
-
-Publish:
-
-- AppVeyorWaitForBuildJobs:
-    IfExists: env:PUBLISH
-    UnlessExists: env:APPVEYOR_PULL_REQUEST_NUMBER
-    ApiKeyID: AppVeyorBearerToken
-
-- PublishPowerShellModule:
-    IfExists: env:PUBLISH
-    UnlessExists: env:APPVEYOR_PULL_REQUEST_NUMBER
-    RepositoryName: PSGallery
-    RepositoryUri: https://powershellgallery.com/api/v2/
-    Path: Carbon.Cryptography
-    ApiKeyID: PowerShellGalleryApiKey
-
-- SetVariableFromPowerShellDataFile:
-    Path: Carbon.Cryptography\Carbon.Cryptography.psd1
-    Variables:
-        PrivateData:
-            PSData:
-                ReleaseNotes: RELEASE_NOTES
-
-- GitHubRelease:
-    IfExists: env:PUBLISH
-    UnlessExists: env:APPVEYOR_PULL_REQUEST_NUMBER
-    RepositoryName: webmd-health-services/Carbon.Cryptography
-    ApiKeyID: GitHubAccessToken
-    Tag: $(WHISKEY_SEMVER2_NO_BUILD_METADATA)
-    Commitish: $(WHISKEY_SCM_COMMIT_ID)
-    Name: $(WHISKEY_SEMVER2_NO_BUILD_METADATA)
-    Description: $(RELEASE_NOTES)
-    Assets:
-    - Path: .output\Carbon.Cryptography.zip
-      ContentType: application/zip
-      Name: Carbon.Cryptography-$(WHISKEY_SEMVER2_NO_BUILD_METADATA).zip
