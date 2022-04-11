@@ -97,96 +97,17 @@ function Find-TlsCertificate
         $HostName= "$($ipProperties.HostName).$($ipProperties.DomainName)"
     }
 
-    $certificates = Get-Certificate -StoreName My | Sort-Object -Property 'NotAfter' -Descending
-
-    $isFirstCert = $true
-    foreach( $certificate in $certificates )
+    $certificate =
+        Find-Certificate -HostName $HostName `
+                         -Active `
+                         -HasPrivateKey `
+                         -KeyUsageName 'Server Authentication' `
+                         -Trusted:$Trusted |
+        Sort-Object -Property 'NotAfter' -Descending |
+        Select-Object -First 1
+    
+    if( $certificate )
     {
-        if( $isFirstCert )
-        {
-            $isFirstCert = $false
-        }
-        else
-        {
-            Write-Verbose ('')
-        }
-
-        Write-Verbose -Message ("$($certificate.Thumbprint)")
-        Write-Verbose -Message ("$($certificate.SubjectName.Name)")
-        if( $certificate.HasPrivateKey )
-        {
-            Write-Verbose -message "    private key      $($true)"
-        }
-        else
-        {
-            Write-Verbose -Message "  ! private key      $($false)"
-            continue
-        }
-
-        $startDate = $certificate.NotBefore.ToString('yyyy-MM-dd HH:mm:ss')
-        if( $certificate.NotBefore -lt  (Get-Date) )
-        {
-            Write-Verbose -Message "    start date       $($startDate)"
-        }
-        else
-        {
-            Write-Verbose -Message "  ! start date       $($startDate)"
-            continue
-        }
-
-        $expirationDate = $certificate.NotAfter.ToString('yyyy-MM-dd HH:mm:ss')
-        if( (Get-Date) -lt $certificate.NotAfter )
-        {
-            Write-Verbose -Message "    expiration date  $($expirationDate)"
-        }
-        else
-        {
-            Write-Verbose -Message "  ! expiration date  $($expirationDate)"
-            continue
-        }
-
-        $dnsNameList = $certificate.DnsNameList -join ''', '''
-        if( $certificate.DnsNameList -contains $HostName )
-        {
-            Write-Verbose -Message "    hostname         ['$($dnsNameList)']"
-        }
-        else
-        {
-            Write-Verbose -Message "  ! hostname         ['$($dnsNameList)']"
-            continue
-        }
-
-        $keyUsages = $certificate.EnhancedKeyUsageList | Select-Object -ExpandProperty 'FriendlyName'
-        $keyUsages = $keyUsages -join ''', '''
-        if( $certificate.EnhancedKeyUsageList.Count -eq 0 )
-        {
-            Write-Verbose -Message "    key usage        Any"
-        }
-        elseif( $certificate.EnhancedKeyUsageList | Where-Object { $_.FriendlyName -eq 'Server Authentication' } )
-        {
-            Write-Verbose -Message "    key usage        ['$($keyUsages)']"
-        }
-        else
-        {
-            Write-Verbose -Message "  ! key usage        ['$($keyUsages)']"
-            continue
-        }
-
-        if( $Trusted )
-        {
-            # Do this last as it can be slow.
-            if( $certificate.Verify() )
-            {
-                Write-Verbose -Message "    trusted          $($true)"
-            }
-            else
-            {
-                Write-Verbose -Message "  ! trusted          $($false)"
-                continue
-            }
-        }
-        
-        Write-Verbose -Message '^--------------------------------------^'
         return $certificate
     }
 

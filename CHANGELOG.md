@@ -1,4 +1,10 @@
 
+# 2.3.0
+
+* Added `Find-CCertificate` function for finding certificates by searching subjects, start/end dates, private keys,
+  hostnames, key usages, and whether or not they are trusted.
+
+
 # 2.2.1
 
 * Fixed: `Install-CCertificate` fails when loading a certificate from a file and when adding a certificate to a store.

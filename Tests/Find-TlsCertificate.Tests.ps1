@@ -1,136 +1,142 @@
+
+#Requires -Version 5.1
 Set-StrictMode -Version 'Latest'
 
-& (Join-Path -Path $PSScriptRoot -ChildPath 'Initialize-Test.ps1' -Resolve)
+BeforeDiscovery {
+    & (Join-Path -Path $PSScriptRoot -ChildPath 'Initialize-Test.ps1' -Resolve)
+}
 
-$machineName = [Environment]::MachineName
-$foundCert = $null
-$mockedCertificates = [Collections.ArrayList]::new()
+BeforeAll {
+    function GivenCertificate
+    {
+        param(
+            [Parameter(Mandatory)]
+            [String] $For,
 
-function GivenCertificate
-{
-    param(
-        [Parameter(Mandatory)]
-        [String] $For,
+            [String] $WithThumbprint,
 
-        [String] $WithThumbprint = $script:thumbprint,
+            [switch] $WithNoPrivateKey,
 
-        [switch] $WithNoPrivateKey,
+            [String[]] $WithDnsNames = @(),
 
-        [String[]] $WithDnsNames = @(),
+            [String[]] $WithUsages = @(),
 
-        [String[]] $WithUsages = @(),
+            [switch] $ThatIsTrusted,
 
-        [switch] $ThatIsTrusted,
+            [datetime] $ThatStarts = (Get-Date).AddDays(-1),
 
-        [datetime] $ThatStarts = (Get-Date).AddDays(-1),
+            [datetime] $ThatExpires = (Get-Date).AddYears(2)
+        )
 
-        [datetime] $ThatExpires = (Get-Date).AddYears(2)
-    )
-
-    $fullDnsList = & {
-        $For
-        if( $WithDnsNames )
-        {
-            $WithDnsNames
+        $fullDnsList = & {
+            $For
+            if( $WithDnsNames )
+            {
+                $WithDnsNames
+            }
         }
+
+        $mockArgs = @{}
+        if( $WithThumbprint )
+        {
+            $mockArgs['Thumbprint'] = $WithThumbprint
+        }
+
+        if( $WithUsages )
+        {
+            $mockArgs['KeyUsageName'] = $WithUsages
+        }
+
+        if( $ThatIsTrusted )
+        {
+            $mockArgs['Trusted'] = $true
+        }
+
+        if( -not $WithNoPrivateKey )
+        {
+            $mockArgs['HasPrivateKey'] = $true
+        }
+
+        $mockCert = New-MockCertificate -Subject "CN=$($For)" `
+                                        -SubjectAlternateName $fullDnsList `
+                                        -NotBefore $ThatStarts `
+                                        -NotAfter $ThatExpires `
+                                        @mockArgs
+
+        [void] $script:mockedCertificates.Add($mockCert)
     }
-    $keyUsages = [Collections.ArrayList]::New()
-    $WithUsages |
-        ForEach-Object { [pscustomobject]@{ 'FriendlyName' = $_; } } |
-        ForEach-Object { [void]$keyUsages.Add($_) }
-    $certificate = [pscustomobject]@{
-        'Thumbprint' = $WithThumbprint;
-        'SubjectName' = [pscustomobject]@{
-            'Name' = "CN=$($For)";
-        };
-        'DnsNameList' = $fullDnsList;
-        'EnhancedKeyUsageList' = $keyUsages;
-        'HasPrivateKey' = -not $WithNoPrivateKey;
-        'NotBefore' = $ThatStarts;
-        'NotAfter' = $ThatExpires;
-    }
-    $verify = { $false }
-    if( $ThatIsTrusted )
+
+    function ThenFoundCertificate 
     {
-        $verify = { $true }
+        param(
+            [String] $WithThumbprint
+        )
+
+        if( -not $WithThumbprint )
+        {
+            $WithThumbprint = $script:mockedCertificates[0].Thumbprint
+        }
+
+        $script:foundCert | Should -Not -BeNullOrEmpty
+        $script:foundCert | Should -HaveCount 1
+        $script:foundCert.Thumbprint | Should -Be $WithThumbprint
     }
-    $certificate | Add-Member -MemberType ScriptMethod -Name 'Verify' -Value $verify
-    [void] $mockedCertificates.Add($certificate)
+
+    function ThenNoCertificateFound
+    {
+        param(
+            [switch] $AndNoError
+        )
+
+        $script:foundCert | Should -BeNullOrEmpty
+
+        if( $AndNoError )
+        {
+            return
+        }
+
+        $Global:Error | Should -Not -BeNullOrEmpty
+        $Global:Error | Should -Match 'certificate for .* does not exist'
+    }
+
+    function WhenFindingTlsCertificate
+    {
+        [CmdletBinding()]
+        param(
+            [String] $Name,
+
+            [switch] $ThatIsTrusted
+        )
+
+        $installedCertificates = $script:mockedCertificates
+
+        Mock -CommandName 'Get-Certificate' `
+            -ModuleName 'Carbon.Cryptography' `
+            -MockWith { $installedCertificates }.GetNewClosure()
+
+        $optionalParams = @{}
+        if( $Name )
+        {
+            $optionalParams['HostName'] = $Name
+        }
+
+        if( $ThatIsTrusted )
+        {
+            $optionalParams['Trusted'] = $ThatIsTrusted
+        }
+        
+        $script:foundCert = Find-CTlsCertificate @optionalParams
+    }
 }
 
-function Init 
-{
-    $Global:Error.Clear()
-    $script:foundCert = $null
-    $script:mockedCertificates = [Collections.ArrayList]::new()
-    $script:thumbprint = [Guid]::NewGuid().ToString()
-}
-
-function ThenFoundCertificate 
-{
-    param(
-        [String] $WithThumbprint
-    )
-
-    if( -not $WithThumbprint )
-    {
-        $WithThumbprint = $script:mockedCertificates[0].Thumbprint
+Describe 'Find-TlsCertificate' {
+    BeforeEach {
+        $Global:Error.Clear()
+        $script:foundCert = $null
+        $script:mockedCertificates = [Collections.ArrayList]::new()
     }
 
-    $script:foundCert | Should -Not -BeNullOrEmpty
-    $script:foundCert | Should -HaveCount 1
-    $script:foundCert.Thumbprint | Should -Be $WithThumbprint
-}
-
-function ThenNoCertificateFound
-{
-    param(
-        [switch] $AndNoError
-    )
-
-    $script:foundCert | Should -BeNullOrEmpty
-
-    if( $AndNoError )
-    {
-        return
-    }
-
-    $Global:Error | Should -Not -BeNullOrEmpty
-    $Global:Error | Should -Match 'certificate for .* does not exist'
-}
-
-function WhenFindingTlsCertificate
-{
-    [CmdletBinding()]
-    param(
-        [String] $Name,
-
-        [switch] $ThatIsTrusted
-    )
-
-    $installedCertificates = $script:mockedCertificates
-
-    Mock -CommandName 'Get-Certificate' `
-         -ModuleName 'Carbon.Cryptography' `
-         -MockWith { $installedCertificates }.GetNewClosure()
-
-    $optionalParams = @{}
-    if( $Name )
-    {
-        $optionalParams['HostName'] = $Name
-    }
-
-    if( $ThatIsTrusted )
-    {
-        $optionalParams['Trusted'] = $ThatIsTrusted
-    }
-    
-    $script:foundCert = Find-CTlsCertificate @optionalParams
-}
-
-Describe 'Find-TlsCertificate.when a matching certificate exists' {
-    It 'should find a certificate' {
-        Init
+    It 'should find a certificate when a matching certificate exists' {
         GivenCertificate -For 'cert1'
         GivenCertificate -For 'cert2'
         GivenCertificate -For 'cert3'
@@ -139,104 +145,71 @@ Describe 'Find-TlsCertificate.when a matching certificate exists' {
         WhenFindingTlsCertificate 'cert5'
         ThenFoundCertificate -WithThumbprint 'cert5thumbprint'
     }
-}
 
-Describe 'Find-TlsCertificate.when no certificates match hostname' {
-    It 'should not find a certificate' {
-        Init
+    It 'should not find a certificate when no certificates match hostname' {
         GivenCertificate -For 'does not match hostname'
         GivenCertificate -For 'also does not match hostname'
         WhenFindingTlsCertificate 'example.com' -ErrorAction SilentlyContinue
         ThenNoCertificateFound 
     }
-}
 
-Describe 'Find-TlsCertificate.when no private key exists' {
-    It 'should not find a certificate' {
-        Init
+    It 'should not find a certificate when no private key exists' {
         GivenCertificate -For 'noprivatekey.com' -WithNoPrivateKey
         WhenFindingTlsCertificate 'noprivatekey.com' -ErrorAction SilentlyContinue
         ThenNoCertificateFound 
     }
-}
 
-Describe 'Find-TlsCertificate.when subject alternate name matches' {
-    It 'should find the certificate' {
-        Init
+    It 'should find the certificate when subject alternate name matches' {
         GivenCertificate -For $machineName -WithDnsNames ('fake.net', 'fake2.net')
         WhenFindingTlsCertificate 'fake2.net'
         ThenFoundCertificate
     }
-}
 
-Describe 'Find-TlsCertificate.when key usage is not Server Authentication' {
-    It 'should not find a certificate' {
-        Init
+    It 'should not find a certificate when key usage is not Server Authentication' {
         GivenCertificate -For 'invalidkeyusage.com' -WithUsages ('Remote Desktop Authentication', 'Client Authentication') 
         WhenFindingTlsCertificate 'invalidkeyusage.com' -ErrorAction SilentlyContinue
         ThenNoCertificateFound 
     }
-}
 
-Describe 'Find-TlsCertificate.when key usage is Server Authentication' {
-    It 'should not find a certificate' {
-        Init
+    It 'should not find a certificate when key usage is Server Authentication' {
         GivenCertificate -For 'validkeyusage.com' -WithUsages ('Remote Desktop Authentication', 'Server Authentication') 
         WhenFindingTlsCertificate 'validkeyusage.com'
         ThenFoundCertificate
     }
-}
 
-Describe 'Find-TlsCertificate.when certificate is trusted' {
-    It 'should not find a certificate' {
-        Init
+    It 'should not find a certificate when certificate is trusted' {
         GivenCertificate -For 'trusted.com' -ThatIsTrusted
         WhenFindingTlsCertificate 'trusted.com' -ThatIsTrusted
         ThenFoundCertificate
     }
-}
 
-Describe 'Find-TlsCertificate.when certificate is not trusted' {
-    It 'should not find a certificate' {
-        Init
+    It 'should not find a certificate when certificate is not trusted' {
         GivenCertificate -For 'nottrusted.com'
         WhenFindingTlsCertificate 'nottrusted.com' -ThatIsTrusted -ErrorAction SilentlyContinue
         ThenNoCertificateFound
     }
-}
 
-Describe 'Find-TlsCertificate.when certificate is expired' {
-    It 'should not find a certificate' {
-        Init
+    It 'should not find a certificate when certificate is expired' {
         GivenCertificate -For 'expired.com' -ThatExpires (Get-Date).AddDays(-1)
         WhenFindingTlsCertificate 'expired.com' -ErrorAction SilentlyContinue
         ThenNoCertificateFound 
     }
-}
 
-Describe 'Find-TlsCertificate.when certificate has not started' {
-    It 'should not find a certificate' {
-        Init
+    It 'should not find a certificate when certificate has not started' {
         GivenCertificate -For 'notstarted.com' -ThatStarts (Get-Date).AddDays(1)
         WhenFindingTlsCertificate 'notstarted.com' -ErrorAction SilentlyContinue
         ThenNoCertificateFound
     }
-}
 
-Describe 'Find-TlsCertificate.when getting certificate for current machine' {
-    It 'should return cert that matches hostname from global IP properties' {
-        Init
+    It 'should return cert that matches hostname from global IP properties when getting certificate for current machine' {
         $ipProperties = [Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties()
         $thisHostName= "$($ipProperties.HostName).$($ipProperties.DomainName)"
         GivenCertificate -For $thisHostName
         WhenFindingTlsCertificate
         ThenFoundCertificate
     }
-}
 
-Describe 'Find-TlsCertificate.when ignoring that a certificate is not found' {
-    It 'should not fail' {
-        Init
+    It 'should not fail when ignoring that a certificate is not found' {
         WhenFindingTlsCertificate 'doesnotexist.com' -ErrorAction Ignore
         ThenNoCertificateFound -AndNoError
     }

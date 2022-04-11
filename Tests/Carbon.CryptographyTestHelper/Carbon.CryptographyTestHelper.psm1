@@ -20,6 +20,65 @@ function Get-TestUserCredential
     return [pscredential]::New($Name, (ConvertTo-SecureString -String $password -AsPlainText -Force))
 }
 
+function New-MockCertificate
+{
+    param(
+        [Parameter(Mandatory)]
+        [String] $Subject,
+
+        [String] $Thumbprint,
+
+        [switch] $HasPrivateKey,
+
+        [String[]] $SubjectAlternateName = @(),
+
+        [String[]] $KeyUsageName = @(),
+
+        [String[]] $KeyUsageOid = @(),
+
+        [switch] $Trusted,
+
+        [datetime] $NotBefore = (Get-Date).AddDays(-1),
+
+        [datetime] $NotAfter = (Get-Date).AddYears(2)
+    )
+
+    if( -not $Thumbprint )
+    {
+        $Thumbprint = [Guid]::NewGuid().ToString() + [Guid]::NewGuid().ToString()
+        $Thumbprint = $Thumbprint -replace '[^a-f0-9]', ''
+        $Thumbprint = $Thumbprint.Substring(0, 40).ToUpperInvariant()
+    }
+    $keyUsages = [Collections.ArrayList]::New()
+    $KeyUsageName |
+        ForEach-Object { [pscustomobject]@{ 'FriendlyName' = $_; 'ObjectId' = ''; } } |
+        ForEach-Object { [void]$keyUsages.Add($_) }
+    $KeyUsageOid |
+        ForEach-Object { [pscustomobject]@{ 'FriendlyName' = '' ; 'ObjectId' = $_; } } |
+        ForEach-Object { [void]$keyUsages.Add($_) }
+
+    
+    $certificate = [pscustomobject]@{
+        'Thumbprint' = $Thumbprint;
+        'Subject' = $Subject;
+        'SubjectName' = [pscustomobject]@{
+            'Name' = $Subject;
+        };
+        'DnsNameList' = $SubjectAlternateName;
+        'EnhancedKeyUsageList' = $keyUsages;
+        'HasPrivateKey' = $HasPrivateKey;
+        'NotBefore' = $NotBefore;
+        'NotAfter' = $NotAfter;
+    }
+    $verify = { $false }
+    if( $Trusted )
+    {
+        $verify = { $true }
+    }
+    $certificate | Add-Member -MemberType ScriptMethod -Name 'Verify' -Value $verify
+    return $certificate
+}
+
 function Test-TCertificate
 {
     [CmdletBinding()]
@@ -93,7 +152,7 @@ function Test-IsAdministrator
         return $currentIdentity.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     }
 
-    # Don't know how to do this check on other platforms or even if it makes sense?
+    # Don't know how to do this check on other platfornms or even if it makes sense?
     if( (Get-Command -Name 'id' -ErrorAction Ignore) )
     {
         return (id -u) -eq 0
