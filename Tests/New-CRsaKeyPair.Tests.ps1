@@ -10,6 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+#Requires -Version 5.1
 Set-StrictMode -Version 'Latest'
 
 BeforeAll {
@@ -21,6 +22,7 @@ BeforeAll {
     $script:subject = $null
     $script:publicKeyPath = $null
     $script:privateKeyPath = $null
+    $script:output = $null
 
     function Assert-KeyProperty
     {
@@ -48,28 +50,91 @@ BeforeAll {
         $cert.PublicKey.Key.KeySize | Should -Be $Length
         $cert.PublicKey.Key.KeyExchangeAlgorithm | Should -BeLike 'RSA*'
         $cert.SignatureAlgorithm.FriendlyName | Should -Be $Algorithm
-        $keyUsage = $cert.Extensions | Where-Object { $_ -is [Security.Cryptography.X509Certificates.X509KeyUsageExtension] }
-        $keyUsage | Should -Not -BeNullOrEmpty
-        $keyUsage.KeyUsages.HasFlag([Security.Cryptography.X509Certificates.X509KeyUsageFlags]::DataEncipherment) |
-            Should -BeTrue
-        $keyUsage.KeyUsages.HasFlag([Security.Cryptography.X509Certificates.X509KeyUsageFlags]::KeyEncipherment) |
-            Should -BeTrue
-        $enhancedKeyUsage =
-            $cert.Extensions |
-            Where-Object { $_ -is [Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension] }
-        $enhancedKeyUsage | Should -Not -BeNullOrEmpty
+    }
 
-        # I don't think Windows 2008 supports Enhanced Key Usages.
-        $osVersion = (Get-WmiObject -Class 'Win32_OperatingSystem').Version
-        if( $osVersion -notmatch '6.1\b' )
+    function ThenKeyPairCreated
+    {
+        param(
+            [String[]] $WithKeyUsage = @(),
+            [String[]] $WithEnhancedKeyUsage = @()
+        )
+
+        $script:publicKeyPath | Should -Exist
+        $script:privateKeyPath | Should -Exist
+
+        $cert = Get-CCertificate -Path $script:publicKeyPath
+        if( $WithKeyUsage )
         {
-            $usage = $enhancedKeyUsage.EnhancedKeyUsages | Where-Object { $_.FriendlyName -eq 'Document Encryption' }
-            $usage | Should -Not -BeNullOrEmpty
+            $actualKeyUsage = 
+                $cert.Extensions |
+                Where-Object { $_.Oid.FriendlyName -eq 'Key Usage' } |
+                Select-Object -ExpandProperty 'KeyUsages' |
+                Sort-Object
+            (($actualKeyUsage -split ',\ ' | Sort-Object) -join ',') |
+                Should -Be (($WithKeyUsage | Sort-Object) -join ',')
         }
+        else
+        {
+            $cert.Extensions | Where-Object { $_.Oid.FriendlyName -eq 'Key Usage' } | Should -BeNullOrEmpty
+        }
+
+        if( $WithEnhancedKeyUsage )
+        {
+            $cert.EnhancedKeyUsageList.FriendlyName | Should -BeIn $WithEnhancedKeyUsage
+        }
+        else
+        {
+            $cert.EnhancedKeyUsageList | Should -BeNullOrEmpty
+        }
+    }
+
+    function ThenNotInCertStore
+    {
+        $cert = Get-CCertificate -Path $script:output.PublicKeyFile.FullName
+        $cert | Should -Not -BeNullOrEmpty
+        Join-Path -Path 'cert:\LocalMachine\CurrentUser' -ChildPath $cert.Thumbprint | Should -Not -Exist
+    }
+
+    function ThenReturnedKeyPairInfo
+    {
+        $script:output | Should -Not -BeNullOrEmpty
+        $script:output | Should -HaveCount 1
+        $script:output.PublicKeyFile.FullName | Should -Be $script:publicKeyPath
+        $script:output.PrivateKeyFile.FullName | Should -Be $script:privateKeyPath
+    }
+
+    function WhenCreatingKeyPair
+    {
+        param(
+            [Parameter(Position=0)]
+            [hashtable] $WithArgument = @{}
+        )
+
+        if( -not $WithArgument.ContainsKey('Subject') )
+        {
+            $WithArgument['Subject'] = $script:subject
+        }
+
+        if( -not $WithArgument.ContainsKey('PublicKeyFile') )
+        {
+            $WithArgument['PublicKeyFile'] = $script:publicKeyPath
+        }
+
+        if( -not $WithArgument.ContainsKey('PrivateKeyFile') )
+        {
+            $WithArgument['PrivateKeyFile'] = $script:privateKeyPath
+        }
+
+        if( -not $WithArgument.ContainsKey('Password') )
+        {
+            $WithArgument['Password'] = $script:privateKeyPassword
+        }
+
+        $script:output = New-CRsaKeyPair @WithArgument
     }
 }
 
-Describe 'New-RsaKeyPair' {
+Describe 'New-CRsaKeyPair' -Skip:(-not (Get-Command -Name 'certreq.exe' -ErrorAction Ignore)) {
     BeforeEach {
         $script:testDir = Join-Path -Path $TestDrive -ChildPath ($script:testNum++)
         $Global:Error.Clear()
@@ -77,30 +142,27 @@ Describe 'New-RsaKeyPair' {
         $script:subject = 'CN={0}' -f [Guid]::NewGuid()
         $script:publicKeyPath = Join-Path -Path $script:testDir -ChildPath 'public.cer'
         $script:privateKeyPath = Join-Path -Path $script:testDir -ChildPath 'private.pfx'
+        $script:output = $null
+    }
+
+    AfterEach {
+        Copy-Item $script:publicKeyPath -Destination $PSScriptRoot -ErrorAction Ignore
+        Copy-Item $script:privateKeyPath -Destination $PSScriptRoot -ErrorAction Ignore
+        [pscredential]::New('user', $script:privateKeyPassword).GetNetworkCredential().Password |
+            Set-Content -Path (Join-Path -Path $PSScriptRoot -ChildPath 'PASSWORD')
     }
 
     It 'should generate a public/private key pair' {
-        $output = New-CRsaKeyPair -Subject $script:subject `
-                                  -PublicKeyFile $script:publicKeyPath `
-                                  -PrivateKeyFile $script:privateKeyPath `
-                                  -Password $script:privateKeyPassword
-        $output | Should -Not -BeNullOrEmpty
-        $output.Count | Should -Be 2
-
-        $script:publicKeyPath | Should -Exist
-        $output[0].FullName | Should -Be $script:publicKeyPath
-
-        $script:privateKeyPath | Should -Exist
-        $output[1].FullName | Should -Be $script:privateKeyPath
-
+        WhenCreatingKeyPair -WithArgument @{ 'KeyUsage' = 'DocumentEncryption' }
+        ThenKeyPairCreated -WithKeyUsage 'DataEncipherment', 'KeyEncipherment' `
+                           -WithEnhancedKeyUsage 'Document Encryption'
+        ThenReturnedKeyPairInfo
+        ThenNotInCertStore
         Assert-KeyProperty
     }
 
     It 'should generate a key usable by DSC' -Skip:($PSVersionTable['PSEdition'] -eq 'Core') {
-        $output = New-CRsaKeyPair -Subject $script:subject `
-                                  -PublicKeyFile $script:publicKeyPath `
-                                  -PrivateKeyFile $script:privateKeyPath `
-                                  -Password $script:privateKeyPassword
+        WhenCreatingKeyPair -WithArgument @{ 'KeyUsage' = 'DocumentEncryption' }
         # Make sure we can decrypt things with it.
         $secret = [IO.Path]::GetRandomFileName()
         $protectedSecret = Protect-CString -String $secret -Certificate $script:publicKeyPath
@@ -163,10 +225,7 @@ Describe 'New-RsaKeyPair' {
 
     It 'should generate key pairs that can be used by CMS cmdlets' `
        -Skip:(-not (Get-Command -Name 'Protect-CmsMessage' -ErrorAction Ignore)) {
-        $output = New-CRsaKeyPair -Subject $script:subject `
-                                  -PublicKeyFile $script:publicKeyPath `
-                                  -PrivateKeyFile $script:privateKeyPath `
-                                  -Password $script:privateKeyPassword
+        WhenCreatingKeyPair -WithArgument @{ 'KeyUsage' = 'DocumentEncryption' }
 
         $cert = Install-CCertificate -Path $script:privateKeyPath `
                                      -StoreLocation CurrentUser `
@@ -190,34 +249,31 @@ Describe 'New-RsaKeyPair' {
         $validTo = [datetime]::Now.AddDays(30)
         $length = 2048
 
-        $output = New-CRsaKeyPair -Subject $script:subject `
-                                  -PublicKeyFile $script:publicKeyPath `
-                                  -PrivateKeyFile $script:privateKeyPath `
-                                  -Password $script:privateKeyPassword `
-                                  -ValidTo $validTo `
-                                  -Length $length `
-                                  -Algorithm sha1
+        $withArgs = @{
+            ValidTo = $validTo;
+            Length = $length;
+            Algorithm = 'sha1';
+            KeyUsage = 'DocumentEncryption'
+        }
 
+        WhenCreatingKeyPair -WithArgument $withArgs
+        ThenKeyPairCreated -WithKeyUsage 'DataEncipherment', 'KeyEncipherment' `
+                           -WithEnhancedKeyUsage 'Document Encryption'
+        ThenReturnedKeyPairInfo
+        ThenNotInCertStore
         Assert-KeyProperty -Length $length -ValidTo $validTo -Algorithm 'sha1RSA'
-
     }
 
     It 'should reject subjects that don''t begin with CN=' {
-        {
-            New-CRsaKeyPair -Subject 'fubar' `
-                            -PublicKeyFile $script:publicKeyPath `
-                            -PrivateKeyFile $script:privateKeyPath `
-                            -Password $script:privateKeyPassword
-        } | Should -Throw
+        { WhenCreatingKeyPair -WithArgument @{ Subject = 'What''s up doc?' } } | Should -Throw
         $Global:Error[0] | Should -Match 'does not match'
     }
 
     It 'should not protect private key' {
-        $output = New-CRsaKeyPair -Subject $script:subject `
-                                  -PublicKeyFile $script:publicKeyPath `
-                                  -PrivateKeyFile $script:privateKeyPath `
-                                  -Password $null
-        $output.Count | Should -Be 2
+        WhenCreatingKeyPair -WithArgument @{ KeyUsage = 'DocumentEncryption' ; Password = $null }
+        ThenKeyPairCreated -WithKeyUsage 'DataEncipherment', 'KeyEncipherment' `
+                           -WithEnhancedKeyUsage 'Document Encryption'
+        ThenReturnedKeyPairInfo
 
         $privateKey = Get-CCertificate -Path $script:privateKeyPath
         $privateKey | Should -Not -BeNullOrEmpty
@@ -226,5 +282,79 @@ Describe 'New-RsaKeyPair' {
         $protectedSecret = Protect-CString -String $secret -PublicKeyPath $script:publicKeyPath
         Unprotect-CString -ProtectedString $protectedSecret -PrivateKeyPath $script:privateKeyPath -AsPlainText |
             Should -Be $secret
+    }
+
+    It 'should generate certificate for client authentication' {
+        WhenCreatingKeyPair -WithArgument @{ KeyUsage = 'ClientAuthentication' }
+        ThenKeyPairCreated -WithKeyUsage 'DigitalSignature', 'KeyEncipherment' `
+                           -WithEnhancedKeyUsage 'Client Authentication'
+        ThenReturnedKeyPairInfo
+        ThenNotInCertStore
+    }
+
+    It 'should generate certificate for code signing' {
+        WhenCreatingKeyPair -WithArgument @{ KeyUsage = 'CodeSigning' }
+        ThenKeyPairCreated -WithKeyUsage 'DigitalSignature' -WithEnhancedKeyUsage 'Code Signing'
+        ThenReturnedKeyPairInfo
+        ThenNotInCertStore
+    }
+
+    It 'should generate certificate for document encryption' {
+        WhenCreatingKeyPair -WithArgument @{ KeyUsage = 'DocumentEncryption' }
+        ThenKeyPairCreated -WithKeyUsage 'DataEncipherment','KeyEncipherment' `
+                           -WithEnhancedKeyUsage 'Document Encryption'
+        ThenReturnedKeyPairInfo
+        ThenNotInCertStore
+    }
+
+    It 'should generate certificate for document signing' {
+        WhenCreatingKeyPair -WithArgument @{ KeyUsage = 'DocumentSigning' }
+        ThenKeyPairCreated -WithKeyUsage 'DigitalSignature' -WithEnhancedKeyUsage 'Document Signing'
+        ThenReturnedKeyPairInfo
+        ThenNotInCertStore
+    }
+
+    It 'should generate certificate for server authentication' {
+        WhenCreatingKeyPair -WithArgument @{ KeyUsage = 'ServerAuthentication' }
+        ThenKeyPairCreated -WithKeyUsage 'DigitalSignature', 'KeyEncipherment' `
+                           -WithEnhancedKeyUsage 'Server Authentication'
+        ThenReturnedKeyPairInfo
+        ThenNotInCertStore
+    }
+
+    It 'should generate certificate for all usages' {
+        $allUsages =
+            @('ClientAuthentication', 'CodeSigning', 'DocumentEncryption', 'DocumentSigning', 'ServerAuthentication')
+        WhenCreatingKeyPair -WithArgument @{ KeyUsage = $allUsages }
+        $enhancedUsage = @(
+            'Client Authentication',
+            'Code Signing',
+            'Document Encryption',
+            'Document Signing',
+            'Server Authentication'
+        )
+        ThenKeyPairCreated -WithKeyUsage 'DataEncipherment', 'DigitalSignature', 'KeyEncipherment' `
+                           -WithEnhancedKeyUsage $enhancedUsage
+        ThenReturnedKeyPairInfo
+        ThenNotInCertStore
+    }
+
+    It 'should replace existing files' {
+        New-Item -Path $script:testDir -ItemType 'Directory' -Force
+        New-Item -Path $script:publicKeyPath
+        New-Item -Path $script:privateKeyPath
+        WhenCreatingKeyPair -WithArgument @{ Force = $true }
+        ThenKeyPairCreated
+        ThenReturnedKeyPairInfo
+        ThenNotInCertStore
+        (Get-Item -Path $script:publicKeyPath).Length | Should -Not -Be 0
+        (Get-Item -Path $script:privateKeyPath).Length | Should -Not -Be 0
+    }
+
+    It 'should create a cert suitable for any purpose' {
+        WhenCreatingKeyPair
+        ThenKeyPairCreated
+        ThenReturnedKeyPairInfo
+        ThenNotInCertStore
     }
 }
