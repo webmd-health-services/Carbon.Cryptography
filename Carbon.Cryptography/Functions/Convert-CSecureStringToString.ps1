@@ -1,5 +1,5 @@
 
-function Convert-SecureStringToString
+function Convert-CSecureStringToString
 {
     <#
     .SYNOPSIS
@@ -39,7 +39,7 @@ function Convert-SecureStringToString
         Set-StrictMode -Version 'Latest'
         Use-CallerPreference -Cmdlet $PSCmdlet -Session $ExecutionContext.SessionState
 
-        $bytes = Convert-SecureStringToByte -SecureString $SecureString
+        $bytes = Convert-CSecureStringToByte -SecureString $SecureString
         try
         {
             return [Text.Encoding]::Unicode.GetString($bytes)

@@ -77,14 +77,14 @@ Build:
             Path: Tests\*.Tests.ps1
             ExcludePath:
             - "*\\Carbon.Cryptography.Tests.ps1"
-            - "*\\Convert-SecureStringToString.Tests.ps1"
-            - "*\\Find-TlsCertificate.Tests.ps1"
-            - "*\\Get-Certificate.Tests.ps1"
+            - "*\\Convert-CSecureStringToString.Tests.ps1"
+            - "*\\Find-CTlsCertificate.Tests.ps1"
+            - "*\\Get-CCertificate.Tests.ps1"
             - "*\\Import-Carbon.Cryptography.Tests.ps1"
-            - "*\\Install-Certificate.Tests.ps1"
-            - "*\\Protect-String.Tests.ps1"
-            - "*\\Uninstall-Certificate.Tests.ps1"
-            - "*\\Unprotect-String.Tests.ps1"
+            - "*\\Install-CCertificate.Tests.ps1"
+            - "*\\Protect-CString.Tests.ps1"
+            - "*\\Uninstall-CCertificate.Tests.ps1"
+            - "*\\Unprotect-CString.Tests.ps1"
             Exit: true
         TestResult:
             Enabled: true
@@ -94,10 +94,10 @@ Build:
 - Pester4:
     Script:
     - Tests\Carbon.Cryptography.Tests.ps1
-    - Tests\Convert-SecureStringToString.Tests.ps1
-    - Tests\Get-Certificate.Tests.ps1
+    - Tests\Convert-CSecureStringToString.Tests.ps1
+    - Tests\Get-CCertificate.Tests.ps1
     - Tests\Import-Carbon.Cryptography.Tests.ps1
-    - Tests\Install-Certificate.Tests.ps1
-    - Tests\Protect-String.Tests.ps1
-    - Tests\Uninstall-Certificate.Tests.ps1
-    - Tests\Unprotect-String.Tests.ps1
+    - Tests\Install-CCertificate.Tests.ps1
+    - Tests\Protect-CString.Tests.ps1
+    - Tests\Uninstall-CCertificate.Tests.ps1
+    - Tests\Unprotect-CString.Tests.ps1
