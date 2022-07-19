@@ -21,6 +21,16 @@ Set-StrictMode -Version 'Latest'
 $ErrorActionPreference = 'Stop'
 $InformationPreference = 'Continue'
 
+if( -not (Get-Command -Name 'prism' -ErrorAction Ignore) )
+{
+    Get-PSRepository |
+        ForEach-Object { Set-PSRepository -Name $_.Name -InstallationPolicy Trusted }
+
+    Find-Module -Name 'Prism' -MinimumVersion '0.5.0' |
+        Select-Object -First 1 |
+        Install-Module -Scope CurrentUser
+}
+
 prism install -Recurse
 
 & {
