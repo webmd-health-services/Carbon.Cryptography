@@ -19,6 +19,11 @@ you would change it to:
 If you have automation that installs modules with `Install-Module`, you may need to add the `-AllowClobber` switch if
 you've got previous versions of Carbon.Cryptography or Carbon installed.
 
+## Added
+
+Copied the `New-CRsaKeyPair` function from Carbon. This function generates a public/private key pair suitable for
+document encryption, including in DSC resources and PowerShell's CMS message cmdlets.
+
 ## Changes
 
 Added a `C` prefix to each command and removed the `DefaultCommandPrefix`. PowerShell won't auto-load a module that uses

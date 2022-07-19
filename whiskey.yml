@@ -82,13 +82,26 @@ Build:
             - "*\\Get-CCertificate.Tests.ps1"
             - "*\\Import-Carbon.Cryptography.Tests.ps1"
             - "*\\Install-CCertificate.Tests.ps1"
+            - "*\\New-CRsaKeyPair.Tests.ps1"
             - "*\\Protect-CString.Tests.ps1"
             - "*\\Uninstall-CCertificate.Tests.ps1"
             - "*\\Unprotect-CString.Tests.ps1"
-            Exit: true
+            Throw: true
         TestResult:
             Enabled: true
             OutputPath: .output\pester5.xml
+        Output: Detailed
+
+- Pester:
+    # Because the DSC resource in the test is resolved during parsing not execution.
+    OnlyOnPlatform: Windows
+    Configuration:
+        Run:
+            Path: Tests\New-CRsaKeyPair.Tests.ps1
+            Throw: true
+        TestResult:
+            Enabled: true
+            OutputPath: .output\pester5-new-crsakeypair.xml
         Output: Detailed
 
 - Pester4:
