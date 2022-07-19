@@ -21,24 +21,33 @@ Set-StrictMode -Version 'Latest'
 $ErrorActionPreference = 'Stop'
 $InformationPreference = 'Continue'
 
+prism install -Recurse
+
 & {
-    Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'PSModules\Carbon' -Resolve) -Verbose:$false
-    Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'PSModules\Carbon.Core' -Resolve) -Verbose:$false
+    Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'PSModules\Carbon' -Resolve) `
+                  -Verbose:$false `
+                  -Function @('Install-CUser', 'Grant-CPermission')
+    Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'Carbon.Cryptography\PSModules\Carbon.Core' -Resolve) `
+                  -Verbose:$false `
+                  -Function @('Test-COperatingSystem', 'Invoke-CPowerShell')
 }
 
 $passwordPath = Join-Path -Path $PSScriptRoot -ChildPath 'Tests\.password'
 if( -not (Test-Path -Path $passwordPath) )
 {
+    Write-Verbose -Message ('Generating random password for test accounts.')
     $rng = [Security.Cryptography.RNGCryptoServiceProvider]::New()
-    $randomBytes = [byte[]]::New(9)
+    $randomBytes = [byte[]]::New(12)
     do 
     {
-        Write-Verbose -Message ('Generating random password for test accounts.')
         $rng.GetBytes($randomBytes);
         $password = [Convert]::ToBase64String($randomBytes)
     }
-    # Password needs to contain uppercase letter, lowercase letter, and a number.
-    while( $password -cnotmatch '[A-Z]' -and $password -cnotmatch '[a-z]' -and $password -notmatch '\d' )
+    # Password needs to contain uppercase letter, lowercase letter, a number, and symbol.
+    while( -not ($password -cmatch '[A-Z]' -and `
+                 $password -cmatch '[a-z]' -and `
+                 $password -match '\d' -and `
+                 $password -match '=|\+|\/') )
     $password | Set-Content -Path $passwordPath
 
     Write-Verbose -Message ('Generating IV for encrypting test account password on Linux.')
@@ -57,12 +66,15 @@ $users =
     Import-LocalizedData -BaseDirectory (Join-Path -Path $PSScriptRoot -ChildPath 'Tests') -FileName 'users.psd1' |
     ForEach-Object { $_['Users'] } |
     ForEach-Object { 
-        $_['Description'] = "Carbon.Core $($_['For']) test user."
+        $_['Description'] = "Carbon.Cryptography $($_['For']) test user."
         [pscustomobject]$_ | Write-Output
     }
 
 foreach( $user in $users )
 {
+    $credential = [pscredential]::New($user.Name, (ConvertTo-SecureString $password -AsPlainText -Force))
+    $username = $credential.UserName
+
     if( (Test-COperatingSystem -IsWindows) )
     {
         $maxLength = $user.Description.Length
@@ -71,42 +83,40 @@ foreach( $user in $users )
             $maxLength = 48
         }
         $description = $user.Description.Substring(0, $maxLength)
-        $credential = [pscredential]::New($user.Name, (ConvertTo-SecureString $password -AsPlainText -Force))
         Install-CUser -Credential $credential -Description $description -UserCannotChangePassword
     }
     elseif( (Test-COperatingSystem -IsMacOS) )
     {
-        $newUid = 
-            sudo dscl . -list /Users UniqueID | 
-            ForEach-Object { $username,$uid = $_ -split ' +' ; return [int]$uid } |
-            Sort-Object |
-            Select-Object -Last 1
-        Write-Verbose "  Found highest user ID ""$($newUid)""."
-        $newUid += 1
+        if( -not (sudo dscl . -list /Users | Where-Object { $_ -eq $username }) )
+        {
+            $newUid = 
+                sudo dscl . -list /Users UniqueID | 
+                ForEach-Object { $username,$uid = $_ -split ' +' ; return [int]$uid } |
+                Sort-Object |
+                Select-Object -Last 1
+            Write-Verbose "  Found highest user ID ""$($newUid)""."
+            $newUid += 1
 
-        $username = $user.Name
-
-        Write-Verbose "  Creating $($username) (uid: $($newUid))"
-        # Create the user account
-        sudo dscl . -create /Users/$username
-        sudo dscl . -create /Users/$username UserShell /bin/bash
-        sudo dscl . -create /Users/$username RealName $username
-        sudo dscl . -create /Users/$username UniqueID $newUid
-        sudo dscl . -create /Users/$username PrimaryGroupID 20
-        sudo dscl . -create /Users/$username NFSHomeDirectory /Users/$username
-        sudo dscl . -passwd /Users/$username $password
-        sudo createhomedir -c
+            Write-Verbose "  Creating $($username) (uid: $($newUid))"
+            # Create the user account
+            sudo dscl . -create /Users/$username
+            sudo dscl . -create /Users/$username UserShell /bin/bash
+            sudo dscl . -create /Users/$username RealName $username
+            sudo dscl . -create /Users/$username UniqueID $newUid
+            sudo dscl . -create /Users/$username PrimaryGroupID 20
+        }
     }
     elseif( (Test-COperatingSystem -IsLinux) )
     {
-        $userExists = Get-Content '/etc/passwd' | Where-Object { $_ -match "^$([regex]::Escape($user.Name))\b"}
-        if( $userExists )
-        {
-            continue
-        }
+        $userExists =
+            Get-Content '/etc/passwd' |
+            Where-Object { $_ -match "^$([regex]::Escape($username))\b"}
 
-        Write-Verbose -Message ("Adding user ""$($user.Name)"".")
-        $encryptedPassword = $password | openssl passwd -stdin -salt $salt
-        sudo useradd -p $encryptedPassword -m $user.Name --comment $user.Description
+        if( -not $userExists )
+        {
+            Write-Verbose -Message ("Adding user ""$($username)"".")
+            $encryptedPassword = $password | openssl passwd -stdin -salt $salt
+            sudo useradd -p $encryptedPassword -m $username --comment $user.Description
+        }
     }
 }

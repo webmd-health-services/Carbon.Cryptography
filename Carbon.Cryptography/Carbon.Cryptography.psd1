@@ -17,7 +17,7 @@
     RootModule = 'Carbon.Cryptography.psm1'
 
     # Version number of this module.
-    ModuleVersion = '1.0.3'
+    ModuleVersion = '2.3.0'
 
     # ID used to uniquely identify this module
     GUID = '225b9f63-3e3e-406c-87a0-33d34f30cd8e'
@@ -68,20 +68,24 @@
     # TypesToProcess = @()
 
     # Format files (.ps1xml) to be loaded when importing this module
-    # FormatsToProcess = @( )
+    FormatsToProcess = @(
+        'Formats\Carbon.Cryptography.X509Certificate2.ps1xml'
+    )
 
     # Modules to import as nested modules of the module specified in RootModule/ModuleToProcess
     # NestedModules = @()
 
     # Functions to export from this module. Only list public function here.
     FunctionsToExport = @(
-        'Convert-CSecureStringToByte',
-        'Convert-CSecureStringToString',
-        'Get-CCertificate',
-        'Install-CCertificate',
-        'Protect-CString',
-        'Uninstall-CCertificate',
-        'Unprotect-CString'
+        'Convert-SecureStringToByte',
+        'Convert-SecureStringToString',
+        'Find-Certificate',
+        'Find-TlsCertificate',
+        'Get-Certificate',
+        'Install-Certificate',
+        'Protect-String',
+        'Uninstall-Certificate',
+        'Unprotect-String'
     )
 
     # Cmdlets to export from this module. By default, you get a script module, so there are no cmdlets.
@@ -106,7 +110,7 @@
     # HelpInfoURI = ''
 
     # Default prefix for commands exported from this module. Override the default prefix using Import-Module -Prefix.
-    # DefaultCommandPrefix = ''
+    DefaultCommandPrefix = 'C'
 
     # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
     PrivateData = @{
@@ -115,7 +119,7 @@
 
             # Tags applied to this module. These help with module discovery in online galleries.
             Tags = @( 
-                'Desktop', 'Core', 'Caron', 'security', 'convert', 'securestring', 'string', 'certificate',
+                'Desktop', 'Core', 'Carbon', 'security', 'convert', 'securestring', 'string', 'certificate',
                 'certificates', 'x509', 'x509certificate', 'x509certificates', 'install', 'uninstall', 'encrypt',
                 'decrypt', 'aes', 'rsa', 'protect', 'unprotect', 'crypto', 'cryptography', 'dpapi', 'key', 'public-key',
                 'private-key', 'asymmetric', 'symmetric'
@@ -133,12 +137,7 @@
             Prerelease = ''
 
             # ReleaseNotes of this module
-            ReleaseNotes = @'
-* Fixed: When installing certificates with private keys, the `Install-CCertificate` function causes Windows API to write
-extra files to the directories where private keys are saved.
-* Fixed: In some situations, the `Install-CCertificate` function, when passed a certificate object to install with a
-private key, would fail to install the private key.
-'@
+            ReleaseNotes = 'https://github.com/webmd-health-services/Carbon.Cryptography/blob/main/CHANGELOG.md'
         } # End of PSData hashtable
 
     } # End of PrivateData hashtable

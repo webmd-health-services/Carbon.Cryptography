@@ -1,5 +1,5 @@
 
-function Install-CCertificate
+function Install-Certificate
 {
     <#
     .SYNOPSIS
@@ -45,58 +45,61 @@ function Install-CCertificate
     [CmdletBinding(SupportsShouldProcess, DefaultParameterSetName='FromFileInWindowsStore')]
     [OutputType([Security.Cryptography.X509Certificates.X509Certificate2])]
     param(
+        # The path to the certificate file.
         [Parameter(Mandatory, Position=0, ParameterSetName='FromFileInWindowsStore')]
         [Parameter(Mandatory, Position=0, ParameterSetName='FromFileInCustomStore')]
-        # The path to the certificate file.
-        [String]$Path,
+        [String] $Path,
         
+        # The certificate to install.
         [Parameter(Mandatory, Position=0, ParameterSetName='FromCertificateInWindowsStore')]
         [Parameter(Mandatory, Position=0, ParameterSetName='FromCertificateInCustomStore')]
-        # The certificate to install.
-        [Security.Cryptography.X509Certificates.X509Certificate2]$Certificate,
+        [Security.Cryptography.X509Certificates.X509Certificate2] $Certificate,
         
-        [Parameter(Mandatory)]
         # The location of the certificate's store.  To see a list of acceptable values, run:
         #
         #   > [Enum]::GetValues([Security.Cryptography.X509Certificates.StoreLocation])
-        [Security.Cryptography.X509Certificates.StoreLocation]$StoreLocation,
+        [Parameter(Mandatory)]
+        [Security.Cryptography.X509Certificates.StoreLocation] $StoreLocation,
         
-        [Parameter(Mandatory, ParameterSetName='FromFileInWindowsStore')]
-        [Parameter(Mandatory, ParameterSetName='FromCertificateInWindowsStore')]
         # The name of the certificate's store.  To see a list of acceptable values run:
         #
         #  > [Enum]::GetValues([Security.Cryptography.X509Certificates.StoreName])
-        [Security.Cryptography.X509Certificates.StoreName]$StoreName,
+        [Parameter(Mandatory, ParameterSetName='FromFileInWindowsStore')]
+        [Parameter(Mandatory, ParameterSetName='FromCertificateInWindowsStore')]
+        [Security.Cryptography.X509Certificates.StoreName] $StoreName,
 
+        # The name of the non-standard, custom store where the certificate should be installed.
         [Parameter(Mandatory, ParameterSetName='FromFileInCustomStore')]
         [Parameter(Mandatory, ParameterSetName='FromCertificateInCustomStore')]
-        # The name of the non-standard, custom store where the certificate should be installed.
-        [String]$CustomStoreName,
+        [String] $CustomStoreName,
 
-        [Parameter(ParameterSetName='FromFileInWindowsStore')]
-        [Parameter(ParameterSetName='FromFileInCustomStore')]
         # Mark the private key as exportable. Only valid if loading the certificate from a file.
-        [switch]$Exportable,
-        
         [Parameter(ParameterSetName='FromFileInWindowsStore')]
         [Parameter(ParameterSetName='FromFileInCustomStore')]
+        [switch] $Exportable,
+        
         # The password for the certificate.  Should be a `System.Security.SecureString`.
-        [securestring]$Password,
+        [Parameter(ParameterSetName='FromFileInWindowsStore')]
+        [Parameter(ParameterSetName='FromFileInCustomStore')]
+        [securestring] $Password,
 
         # Use the `Session` parameter to install a certificate on remote computer(s) using PowerShell remoting. Use
         # `New-PSSession` to create a session.
-        [Management.Automation.Runspaces.PSSession[]]$Session,
+        [Management.Automation.Runspaces.PSSession[]] $Session,
 
         # Re-install the certificate, even if it is already installed. Calls the `Add()` method for store even if the
         # certificate is in the store. This function assumes that the `Add()` method replaces existing certificates.
-        [switch]$Force,
+        [switch] $Force,
 
         # Return the installed certificate.
-        [switch]$PassThru
+        [switch] $PassThru
     )
     
     Set-StrictMode -Version 'Latest'
     Use-CallerPreference -Cmdlet $PSCmdlet -Session $ExecutionContext.SessionState
+
+    $ephemeralKeyFlag = [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
+    $defaultKeyFlag = [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::DefaultKeySet
 
     if( $PSCmdlet.ParameterSetName -like 'FromFile*' )
     {   
@@ -110,19 +113,27 @@ function Install-CCertificate
         
         $fileBytes = [IO.File]::ReadAllBytes($Path)
         $encodedCert = [Convert]::ToBase64String($fileBytes)
-
-        # Make sure loading the certificate doesn't leave temporary cruft around on the file system. We're only loading
-        # the cert to get its thumbprint.
-        $keyStorageFlags = @{}
-        if( $StoreLocation -eq [Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser )
+        $keyFlags = $ephemeralKeyFlag
+        if( (Test-COperatingSystem -MacOS) )
         {
-            $keyStorageFlags['KeyStorageFlags'] = 
-                [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
+            $keyFlags = $defaultKeyFlag
         }
-        $Certificate = Get-CCertificate -Path $Path -Password $Password @keyStorageFlags
+
+        # We need the certificate thumbprint so we can check if the certificate exists or not.
+        $Certificate = [Security.Cryptography.X509Certificates.X509Certificate]::New($Path, $Password, $keyFlags)
+        try
+        {
+            $thumbprint = $Certificate.Thumbprint
+        }
+        finally
+        {
+            $Certificate.Reset()
+        }
+        $Certificate = $null
     }
     else
     {
+        $thumbprint = $Certificate.Thumbprint
         $encodedCert = [Convert]::ToBase64String( $Certificate.RawData )
     }
 
@@ -131,6 +142,7 @@ function Install-CCertificate
     {
         $keyFlags = [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::UserKeySet
     }
+
     $keyFlags = $keyFlags -bor [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet
 
     if( $Exportable )
@@ -147,29 +159,29 @@ function Install-CCertificate
     Invoke-Command @invokeCommandArgs -ScriptBlock {
         [CmdletBinding()]
         param(
-            [Parameter(Mandatory)]
             # The base64 encoded certificate to install.
-            [String]$EncodedCertificate,
+            [Parameter(Mandatory)]
+            [String] $EncodedCertificate,
 
             # The password for the certificate.
-            [securestring]$Password,
+            [securestring] $Password,
 
             [Parameter(Mandatory)]
-            [Security.Cryptography.X509Certificates.StoreLocation]$StoreLocation,
+            [Security.Cryptography.X509Certificates.StoreLocation] $StoreLocation,
         
             $StoreName,
 
-            [string]$CustomStoreName,
+            [string] $CustomStoreName,
 
-            [Security.Cryptography.X509Certificates.X509KeyStorageFlags]$KeyStorageFlags,
+            [Security.Cryptography.X509Certificates.X509KeyStorageFlags] $KeyStorageFlags,
 
-            [bool]$Force,
+            [bool] $Force,
 
-            [bool]$WhatIf,
+            [bool] $WhatIf,
 
-            [Management.Automation.ActionPreference]$Verbosity,
+            [Management.Automation.ActionPreference] $Verbosity,
             
-            [String]$Thumbprint
+            [String] $Thumbprint
         )
 
         Set-StrictMode -Version 'Latest'
@@ -179,69 +191,135 @@ function Install-CCertificate
 
         $certFilePath = Join-Path -Path ([IO.Path]::GetTempPath()) -ChildPath ([IO.Path]::GetRandomFileName())
 
-        try
+        [Security.Cryptography.X509Certificates.X509Certificate2] $cert = $null
+        [Security.Cryptography.X509Certificates.X509Store] $store = $null
+        if( $CustomStoreName )
         {
-            if( $CustomStoreName )
-            {
-                $store = [Security.Cryptography.X509Certificates.X509Store]::New($CustomStoreName, $StoreLocation)
-            }
-            else
-            {
-                $StoreName = [Security.Cryptography.X509Certificates.StoreName]$StoreName
-                $store = [Security.Cryptography.X509Certificates.X509Store]::New($StoreName, $StoreLocation)
-            }
+            $storeNameDisplay = $CustomStoreName
+            $store = [Security.Cryptography.X509Certificates.X509Store]::New($CustomStoreName, $StoreLocation)
+        }
+        else
+        {
+            $StoreName = [Security.Cryptography.X509Certificates.StoreName]$StoreName
+            $storeNameDisplay = $StoreName.ToString()
+            $store = [Security.Cryptography.X509Certificates.X509Store]::New($StoreName, $StoreLocation)
+        }
 
-            if( -not $Force )
+        if( -not $Force )
+        {
+            try
             {
                 $store.Open( ([Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly) )
-                try
+                if( $store.Certificates | Where-Object 'Thumbprint' -eq $Thumbprint )
                 {
-                    if( $store.Certificates | Where-Object 'Thumbprint' -eq $Thumbprint )
-                    {
-                        return
-                    }
-                }
-                finally
-                {
-                    $store.Close()
+                    return
                 }
             }
+            catch
+            {
+                $msg = "Exception reading certificates from $($StoreLocation)\$($storeNameDisplay) store: $($_)"
+                Write-Error -Message $msg -ErrorAction $ErrorActionPreference
+                return
+            }
+            finally
+            {
+                $store.Close()
+            }
+        }
 
-            $certBytes = [Convert]::FromBase64String( $EncodedCertificate )
-            [IO.File]::WriteAllBytes( $certFilePath, $certBytes )
+        $certBytes = [Convert]::FromBase64String( $EncodedCertificate )
+        [IO.File]::WriteAllBytes( $certFilePath, $certBytes )
 
+        # Make sure the key isn't persisted if we're not going to store it. 
+        if( $WhatIf )
+        {
+            # We don't use EphemeralKeySet because it isn't supported on macOS.
+            $KeyStorageFlags = [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::DefaultKeySet
+        }
+
+        try
+        {
             $cert = 
                 [Security.Cryptography.X509Certificates.X509Certificate2]::New($certFilePath, $Password, $KeyStorageFlags)
+        }
+        catch
+        {
+            $msg = "Exception reading certificate from file: $($_)"
+            Write-Error -Message $msg -ErrorAction $ErrorActionPreference
+            return
+        }
+        
+        $description = $cert.FriendlyName
+        if( -not $description )
+        {
+            $description = $cert.Subject
+        }
 
+        try
+        {
             $store.Open( ([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite) )
 
-            $description = $cert.FriendlyName
-            if( -not $description )
-            {
-                $description = $cert.Subject
-            }
-
-            $action = "install into $($StoreLocation)'s $($StoreName) store"
+            $action = "install into $($StoreLocation)\$($storeNameDisplay) store"
             $target = "$($description) ($($cert.Thumbprint))"
-            if( $PSCmdlet.ShouldProcess($action, $target) )
+            if( $PSCmdlet.ShouldProcess($target, $action) )
             {
-                $msg = "Installing certificate ""$($description)"" ($($cert.Thumbprint)) into $($StoreLocation)'s " +
-                       "$($StoreName) store."
+                $msg = "Installing certificate ""$($description)"" ($($cert.Thumbprint)) into $($StoreLocation)\" +
+                    "$($storeNameDisplay) store."
                 Write-Verbose -Message $msg 
                 $store.Add( $cert )
             }
-            $store.Close()
+        }
+        catch
+        {
+            if( (Test-COperatingSystem -MacOS) -and ($cert.HasPrivateKey -and -not $Exportable) )
+            {
+                $msg = "Exception installing certificate ""$($description)"" ($($cert.Thumbprint)) into " +
+                       "$($StoreLocation)\$($storeNameDisplay): $($_). On macOS, certificates with private keys " +
+                       "must be exportable. Update $($MyInvocation.MyCommand.Name) with the ""-Exportable"" switch."
+                Write-Error -Message $msg -ErrorAction $ErrorActionPreference
+                return
+            }
+
+            $msg = "Exception installing certificate in $($StoreLocation)\$($storeNameDisplay) store: $($_)"
+            Write-Error -Message $msg -ErrorAction $ErrorActionPreference
+            return
         }
         finally
         {
             Remove-Item -Path $certFilePath -ErrorAction Ignore -WhatIf:$false -Force
-        }
 
-    } -ArgumentList $encodedCert,$Password,$StoreLocation,$StoreName,$CustomStoreName,$keyFlags,$Force,$WhatIfPreference,$VerbosePreference, $Certificate.Thumbprint
+            if( $cert )
+            {
+                $cert.Reset()
+            }
+
+            if( $store )
+            {
+                $store.Close()
+            }
+        }
+    } -ArgumentList $encodedCert,
+                    $Password,
+                    $StoreLocation,
+                    $StoreName,
+                    $CustomStoreName,
+                    $keyFlags,
+                    $Force,
+                    $WhatIfPreference,
+                    $VerbosePreference,
+                    $thumbprint
 
     if( $PassThru )
     {
-        return $Certificate
+        # Don't return a certificate object created by this function. It may have been loaded from a file and stored
+        # in a temp file on disk. If that certificate object isn't properly disposed, the temp file can stick around
+        # slowly filling up disks.
+        $storeParam = @{ StoreName = $StoreName }
+        if( $CustomStoreName )
+        {
+            $storeParam = @{ CustomStoreName = $CustomStoreName }
+        }
+        return Get-Certificate -Thumbprint $thumbprint -StoreLocation $StoreLocation @storeParam
     }
 }
 

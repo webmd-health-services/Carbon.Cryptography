@@ -4,7 +4,7 @@ Set-StrictMode -Version 'Latest'
 
 & (Join-Path -Path $PSScriptRoot -ChildPath 'Initialize-Test.ps1' -Resolve)
 
-Describe 'Convert-CSecureStringToString.when passed a secure string' {
+Describe 'Convert-SecureStringToString.when passed a secure string' {
     It 'should convert it to plaintext' {
         $secret = "Hello World!"
         $secureString = ConvertTo-SecureString -String $secret -AsPlainText -Force
@@ -13,7 +13,7 @@ Describe 'Convert-CSecureStringToString.when passed a secure string' {
     }
 }
 
-Describe 'Convert-CSecureStringToString.when piping secure strings' {
+Describe 'Convert-SecureStringToString.when piping secure strings' {
     It 'should convert each secure string' {
         $plaintexts = 
             & {

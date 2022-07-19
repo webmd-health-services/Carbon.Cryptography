@@ -1,5 +1,5 @@
 
-function Uninstall-CCertificate
+function Uninstall-Certificate
 {
     <#
     .SYNOPSIS
@@ -61,53 +61,71 @@ function Uninstall-CCertificate
     #>
     [CmdletBinding(SupportsShouldProcess, DefaultParameterSetName='ByThumbprint')]
     param(
-        [Parameter(Mandatory, ParameterSetName='ByThumbprint',ValueFromPipelineByPropertyName, ValueFromPipeline)]
-        [Parameter(Mandatory, ParameterSetName='ByThumbprintAndStoreName')]
-        [Parameter(Mandatory, ParameterSetName='ByThumbprintAndCustomStoreName')]
         # The thumbprint of the certificate to remove.
         #
         # If you want to uninstall the certificate from all stores it is installed in, you can pipe the thumbprint to this parameter or you can pipe a certificate object. (This functionality was added in Carbon 2.5.0.)
-        [String]$Thumbprint,
+        [Parameter(Mandatory, ParameterSetName='ByThumbprint', ValueFromPipelineByPropertyName, ValueFromPipeline)]
+        [Parameter(Mandatory, ParameterSetName='ByThumbprintAndStoreName')]
+        [Parameter(Mandatory, ParameterSetName='ByThumbprintAndCustomStoreName')]
+        [String] $Thumbprint,
         
-        [Parameter(Mandatory, ParameterSetName='ByCertificateAndStoreName')]
-        [Parameter(Mandatory, ParameterSetName='ByCertificateAndCustomStoreName')]
         # The certificate to remove
-        [Security.Cryptography.X509Certificates.X509Certificate2]$Certificate,
-        
-        [Parameter(Mandatory, ParameterSetName='ByThumbprintAndStoreName')]
-        [Parameter(Mandatory, ParameterSetName='ByThumbprintAndCustomStoreName')]
         [Parameter(Mandatory, ParameterSetName='ByCertificateAndStoreName')]
         [Parameter(Mandatory, ParameterSetName='ByCertificateAndCustomStoreName')]
+        [Security.Cryptography.X509Certificates.X509Certificate2] $Certificate,
+        
         # The location of the certificate's store.
-        [Security.Cryptography.X509Certificates.StoreLocation]$StoreLocation,
+        [Parameter(Mandatory, ParameterSetName='ByThumbprintAndStoreName')]
+        [Parameter(Mandatory, ParameterSetName='ByThumbprintAndCustomStoreName')]
+        [Parameter(Mandatory, ParameterSetName='ByCertificateAndStoreName')]
+        [Parameter(Mandatory, ParameterSetName='ByCertificateAndCustomStoreName')]
+        [Security.Cryptography.X509Certificates.StoreLocation] $StoreLocation,
         
+        # The name of the certificate's store.
         [Parameter(Mandatory, ParameterSetName='ByThumbprintAndStoreName')]
         [Parameter(Mandatory, ParameterSetName='ByCertificateAndStoreName')]
-        # The name of the certificate's store.
-        [Security.Cryptography.X509Certificates.StoreName]$StoreName,
+        [Security.Cryptography.X509Certificates.StoreName] $StoreName,
 
         [Parameter(Mandatory, ParameterSetName='ByThumbprintAndCustomStoreName')]
         [Parameter(Mandatory, ParameterSetName='ByCertificateAndCustomStoreName')]
-        # The name of the non-standard, custom store where the certificate should be un-installed.
-        [String]$CustomStoreName,
+        [String] $CustomStoreName,
 
-        [Parameter(ParameterSetName='ByThumbprintAndStoreName')]
-        [Parameter(ParameterSetName='ByThumbprintAndCustomStoreName')]
-        [Parameter(ParameterSetName='ByCertificateAndStoreName')]
-        [Parameter(ParameterSetName='ByCertificateAndCustomStoreName')]
         # Use the `Session` parameter to uninstall a certificate on remote computer(s) using PowerShell remoting. Use
         # `New-PSSession` to create a session.
         #
         # Due to a bug in PowerShell, you can't remove a certificate by just its thumbprint over remoting. Using just a
         # thumbprint requires us to enumerate through all installed certificates. When you do this over remoting,
         # PowerShell throws a terminating `The system cannot open the device or file specified` error.
-        [Management.Automation.Runspaces.PSSession[]]$Session
+        [Parameter(ParameterSetName='ByThumbprintAndStoreName')]
+        [Parameter(ParameterSetName='ByThumbprintAndCustomStoreName')]
+        [Parameter(ParameterSetName='ByCertificateAndStoreName')]
+        [Parameter(ParameterSetName='ByCertificateAndCustomStoreName')]
+        [Management.Automation.Runspaces.PSSession[]] $Session
     )
     
     process
     {
         Set-StrictMode -Version 'Latest'
         Use-CallerPreference -Cmdlet $PSCmdlet -Session $ExecutionContext.SessionState
+
+        if( $PSCmdlet.ParameterSetName -eq 'ByThumbprint' )
+        {
+            # Must be in this order. Delete LocalMachine certs *first* so they don't show
+            # up in CurrentUser stores. If you delete a certificate that "cascades" into 
+            # the CurrentUser store first, you'll get errors when running non-
+            # interactively as SYSTEM.
+            $certsToDelete = & {
+                Get-Certificate -StoreLocation LocalMachine -Thumbprint $Thumbprint
+                Get-Certificate -StoreLocation CurrentUser -Thumbprint $Thumbprint
+            }
+            foreach( $certToDelete in $certsToDelete )
+            {
+                Uninstall-Certificate -Thumbprint $Thumbprint `
+                                      -StoreLocation $certToDelete.StoreLocation `
+                                      -StoreName $certToDelete.StoreName
+            }
+            return
+        }
 
         if( $PSCmdlet.ParameterSetName -like 'ByCertificate*' )
         {
@@ -120,101 +138,98 @@ function Uninstall-CCertificate
             $invokeCommandParameters['Session'] = $Session
         }
 
-        if( $PSCmdlet.ParameterSetName -eq 'ByThumbprint' )
+        if( $CustomStoreName )
         {
-            # Must be in this order. Delete LocalMachine certs *first* so they don't show
-            # up in CurrentUser stores. If you delete a certificate that "cascades" into 
-            # the CurrentUser store first, you'll get errors when running non-
-            # interactively as SYSTEM.
-            if( (Test-Path -Path 'cert:') )
-            {
-                Get-ChildItem -Path 'Cert:\LocalMachine','Cert:\CurrentUser' -Recurse |
-                    Where-Object { -not $_.PsIsContainer } |
-                    Where-Object { $_.Thumbprint -eq $Thumbprint } |
-                    ForEach-Object {
-                        $cert = $_
-                        $description = $cert.FriendlyName
-                        if( -not $description )
-                        {
-                            $description = $cert.Subject
-                        }
-
-                        $certPath = $_.PSPath | Split-Path -NoQualifier
-                        Write-Verbose ('Uninstalling certificate ''{0}'' ({1}) at {2}.' -f $description,$cert.Thumbprint,$certPath)
-                        $_
-                    } |
-                    Remove-Item
-            }
-            return
+            # This is just so we can pass a value to the Invoke-Command script block. The store name enum doesn't have a
+            # "not set" value so when it is "$null", the call to Invoke-Command fails.
+            $StoreName = [Security.Cryptography.X509Certificates.StoreName]::My
         }
 
         Invoke-Command @invokeCommandParameters -ScriptBlock {
             [CmdletBinding()]
             param(
                 # The thumbprint of the certificate to remove.
-                [String]$Thumbprint,
+                [String] $Thumbprint,
         
                 # The location of the certificate's store.
-                [Security.Cryptography.X509Certificates.StoreLocation]$StoreLocation,
+                [Security.Cryptography.X509Certificates.StoreLocation] $StoreLocation,
         
                 # The name of the certificate's store.
-                $StoreName,
+                [Security.Cryptography.X509Certificates.StoreName] $StoreName,
 
                 # The name of the non-standard, custom store where the certificate should be un-installed.
-                [String]$CustomStoreName
+                [String] $CustomStoreName
             )
 
             Set-StrictMode -Version 'Latest'
 
             if( $CustomStoreName )
             {
-                $storeNamePath = $CustomStoreName
+                $storeNameDisplay = $CustomStoreName
+                $store = [Security.Cryptography.X509Certificates.X509Store]::New($CustomStoreName, $StoreLocation)
             }
             else
             {
-                $storeNamePath = $StoreName
-                if( $StoreName -eq [Security.Cryptography.X509Certificates.StoreName]::CertificateAuthority )
+                $storeNameDisplay = $StoreName.ToString()
+                $store = [Security.Cryptography.X509Certificates.X509Store]::New($StoreName, $StoreLocation)
+            }
+
+            $certToRemove = $null
+            try
+            {
+                $store.Open( ([Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly) )
+                $certToRemove = $store.Certificates | Where-Object { $_.Thumbprint -eq $Thumbprint }
+                if( -not $certToRemove )
                 {
-                    $storeNamePath = 'CA'
+                    return
                 }
             }
-
-            $certPath = Join-Path -Path 'Cert:\' -ChildPath $StoreLocation
-            $certPath = Join-Path -Path $certPath -ChildPath $storeNamePath
-            $certPath = Join-Path -Path $certPath -ChildPath $Thumbprint
-
-            if( -not (Test-Path -Path $certPath -PathType Leaf) )
+            catch
             {
-                Write-Debug -Message ('Certificate {0} not found.' -f $certPath)
+                $ex = $_.Exception.InnerException
+                while( $ex.InnerException )
+                {
+                    $ex = $ex.InnerException
+                }
+                $msg = "[$($ex.GetType().FullName)] exception reading certificates from $($StoreLocation)\" +
+                       "$($storeNameDisplay) store: $($ex)"
+                Write-Error -Message $msg -ErrorAction $ErrorActionPreference
                 return
             }
-
-            $cert = Get-Item -Path $certPath
-
-            if( $CustomStoreName )
+            finally
             {
-                $store = New-Object 'Security.Cryptography.X509Certificates.X509Store' $CustomStoreName,$StoreLocation
+                $store.Close()
             }
-            else
-            {
-                $store = New-Object 'Security.Cryptography.X509Certificates.X509Store' ([Security.Cryptography.X509Certificates.StoreName]$StoreName),$StoreLocation
-            }
-
-            $store.Open( ([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite) )
 
             try
             {
-                $target = $cert.FriendlyName
+                $store.Open( ([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite) )
+                $target = $certToRemove.FriendlyName
                 if( -not $target )
                 {
-                    $target = $cert.Subject
+                    $target = $certToRemove.Subject
                 }
 
-                if( $PSCmdlet.ShouldProcess( ("certificate {0} ({1})" -f $certPath,$target), "remove" ) )
+                $shouldProcessTarget = "$($target) in $($StoreLocation)\$($storeNameDisplay)"
+                if( $PSCmdlet.ShouldProcess($shouldProcessTarget, 'remove') )
                 {
-                    Write-Verbose ('Uninstalling certificate ''{0}'' ({1}) at {2}.' -f $target,$cert.Thumbprint,$certPath)
-                    $store.Remove( $cert )
+                    $msg = "Uninstalling certificate ""$($target)"" ($($Thumbprint)) from $($StoreLocation)\" +
+                           "$($storeNameDisplay) store."
+                    Write-Verbose $msg
+                    $certToRemove | ForEach-Object { $store.Remove($_) }
                 }
+            }
+            catch
+            {
+                $ex = $_.Exception.InnerException
+                while( $ex.InnerException )
+                {
+                    $ex = $ex.InnerException
+                }
+                $msg = "[$($ex.GetType().FullName)] exception uninstalling certificate in $($StoreLocation)\" +
+                       "$($storeNameDisplay) store: $($ex)"
+                Write-Error -Message $msg -ErrorAction $ErrorActionPreference
+                return
             }
             finally
             {
@@ -223,6 +238,3 @@ function Uninstall-CCertificate
         } -ArgumentList $Thumbprint,$StoreLocation,$StoreName,$CustomStoreName
     }
 }
-
-Set-Alias -Name 'Remove-Certificate' -Value 'Uninstall-CCertificate'
-

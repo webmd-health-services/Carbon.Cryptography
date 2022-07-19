@@ -23,9 +23,10 @@ Add-Type -AssemblyName 'System.Security'
 $moduleRoot = $PSScriptRoot
 $moduleBinRoot = Join-Path -Path $moduleRoot -ChildPath 'bin'
 $moduleBinRoot | Out-Null # To make the PSScriptAnalyzer squiggle go away.
-$privateModulesRoot = Join-Path -Path $moduleRoot -ChildPath 'Modules'
+$privateModulesRoot = Join-Path -Path $moduleRoot -ChildPath 'PSModules'
 
-Import-Module -Name (Join-Path -Path $privateModulesRoot -ChildPath 'Carbon.Core')
+Import-Module -Name (Join-Path -Path $privateModulesRoot -ChildPath 'Carbon.Core') `
+              -Function @('Invoke-CPowerShell', 'Test-COperatingSystem')
 
 # Store each of your module's functions in its own file in the Functions 
 # directory. On the build server, your module's functions will be appended to 
