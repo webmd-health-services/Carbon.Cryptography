@@ -298,7 +298,7 @@ function WhenGettingCertificate
 }
 
 
-Describe 'Get-Certificate.when getting certificate from a file' {
+Describe 'Get-CCertificate.when getting certificate from a file' {
     AfterEach { Reset }
     It ('should have Path property') {
         Init
@@ -307,7 +307,7 @@ Describe 'Get-Certificate.when getting certificate from a file' {
     }
 }
 
-Describe 'Get-Certificate.when getting certificate by path from certificate store' {
+Describe 'Get-CCertificate.when getting certificate by path from certificate store' {
     AfterEach { Reset }
     It ('should have Path property') {
         Init
@@ -408,7 +408,7 @@ $searchTestCases = & {
 $itMsg = 'in { Location = <StoreLocation>; Store = <StoreName>; CustomStoreName = <CustomStoreName> } by { Thumbprint = ' +
          '<Thumbprint> ; Subject = <Subject> ; LiteralSubject = <LiteralSubject> ; FriendlyName = <FriendlyName> ; ' +
          'LiteralFriendlyName = <LiteralFriendlyName> } that { Exists = <Exists> }'
-Describe 'Get-Certificate.when searching for a certificate' {
+Describe 'Get-CCertificate.when searching for a certificate' {
     AfterEach { Reset }
     It $itMsg -TestCases $searchTestCases {
         param(
@@ -488,7 +488,7 @@ $notFoundTestCases = & {
 } |
     ForEach-Object { $_['Exists'] = $false ; $_ | Write-Output }
 
-Describe 'Get-Certificate.when there are no results searching for certificates' {
+Describe 'Get-CCertificate.when there are no results searching for certificates' {
     It $itMsg -TestCases $notFoundTestCases {
         param(
             $StoreLocation,
@@ -538,7 +538,7 @@ $failedSearchTestCases = & {
     }
 }
 
-Describe 'Get-Certificate.when specific certificate does not exist' {
+Describe 'Get-CCertificate.when specific certificate does not exist' {
     AfterEach { Reset }
     It $itMsg -TestCases $failedSearchTestCases {
         param(
@@ -570,7 +570,7 @@ Describe 'Get-Certificate.when specific certificate does not exist' {
     }
 }
 
-Describe 'Get-Certificate.when certificate does not exist but ignoring errors' {
+Describe 'Get-CCertificate.when certificate does not exist but ignoring errors' {
     AfterEach { Reset }
     It 'should not write an error' {
         Init
@@ -582,7 +582,7 @@ Describe 'Get-Certificate.when certificate does not exist but ignoring errors' {
 
 if( (Test-Path -Path 'Cert:\CurrentUser\CA') )
 {
-    Describe 'Get-Certificate.when searching with CertificateAuthority store name' {
+    Describe 'Get-CCertificate.when searching with CertificateAuthority store name' {
         AfterEach { Reset }
         It 'should get certificates in CA store' {
             Init
@@ -602,7 +602,7 @@ if( (Test-Path -Path 'Cert:\CurrentUser\CA') )
     }
 }
 
-Describe 'Get-Certificate.when getting certificate with relative path' {
+Describe 'Get-CCertificate.when getting certificate with relative path' {
     AfterEach { Reset }
     It 'should get certificate' {
         Init
@@ -619,7 +619,7 @@ Describe 'Get-Certificate.when getting certificate with relative path' {
     }
 }
 
-Describe 'Get-Certificate.when certificate file is password protected' {
+Describe 'Get-CCertificate.when certificate file is password protected' {
     AfterEach { Reset }
     It 'should get certificate' {
         Init
@@ -636,7 +636,7 @@ Describe 'Get-Certificate.when certificate file is password protected' {
     }
 }
 
-Describe 'Get-Certificate.when certificate fails to load' {
+Describe 'Get-CCertificate.when certificate fails to load' {
     AfterEach { Reset }
     It 'should include exception in error message' {
         Init
@@ -649,7 +649,7 @@ Describe 'Get-Certificate.when certificate fails to load' {
     }
 }
 
-Describe 'Get-Certificate.when not using parameter name' {
+Describe 'Get-CCertificate.when not using parameter name' {
     AfterEach { Reset }
     It 'should load by path' {
         Init
@@ -660,7 +660,7 @@ Describe 'Get-Certificate.when not using parameter name' {
     }
 }
 
-Describe 'Get-Certificate.when certificate has wildcard character in subject' {
+Describe 'Get-CCertificate.when certificate has wildcard character in subject' {
     AfterEach { Reset }
     It 'should return certificate by literal subject' {
         Init
@@ -671,7 +671,7 @@ Describe 'Get-Certificate.when certificate has wildcard character in subject' {
     }
 }
 
-Describe 'Get-Certificate.when certificate has wildcard character in friendly name' {
+Describe 'Get-CCertificate.when certificate has wildcard character in friendly name' {
     AfterEach { Reset }
     It 'should return certificate by literal friendly name' {
         Init
@@ -690,7 +690,7 @@ Describe 'Get-Certificate.when certificate has wildcard character in friendly na
     }
 }
 
-Describe 'Get-Certificate.when searching for a specific certificate that does not exist using all the search options' {
+Describe 'Get-CCertificate.when searching for a specific certificate that does not exist using all the search options' {
     AfterEach { Reset }
     It 'should fail' {
         Init

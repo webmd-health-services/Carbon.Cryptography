@@ -7,10 +7,10 @@ Set-StrictMode -Version 'Latest'
 $publicKeyFilePath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestPublicKey.cer' -Resolve
 $privateKeyFilePath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestPrivateKey.pfx' -Resolve
 $dsaKeyPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestDsaKey.cer' -Resolve
-$unprotectStringPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\Unprotect-String.ps1' -Resolve
+$unprotectStringPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\Unprotect-CString.ps1' -Resolve
 $testUserCred = Get-TestUserCredential -Name 'CPtString'
 
-Describe 'Protect-String' {
+Describe 'Protect-CString' {
 
     BeforeEach {
         $Global:Error.Clear()
@@ -182,7 +182,7 @@ Describe 'Protect-String' {
 
 if( (Test-TCOperatingSystem -IsWindows) )
 {
-    Describe 'Protect-String.when protecting string as another user' {
+    Describe 'Protect-CString.when protecting string as another user' {
         It 'should protect that string using DPAPI' {
             # special chars to make sure they get handled correctly
             $string = ' f u b a r '' " > ~!@#$%^&*()_+`-={}|:"<>?[]\;,./'
@@ -204,7 +204,7 @@ if( (Test-TCOperatingSystem -IsWindows) )
 
 foreach( $keySize in @( 128, 192, 256 ) )
 {
-    Describe ('Protect-String.when given a {0}-bit key' -f $keySize) {
+    Describe ('Protect-CString.when given a {0}-bit key' -f $keySize) {
         $Global:Error.Clear()
         # Generate a secret that is too long for asymmetric encryption
         $secret = [Guid]::NewGuid().ToString() * 20
@@ -237,7 +237,7 @@ foreach( $keySize in @( 128, 192, 256 ) )
     }
 }
 
-Describe 'Protect-String.when encryption fails' {
+Describe 'Protect-CString.when encryption fails' {
     # Anyone know how to get DPAPI or AES encryption to fail?
     Context 'RSA' {
         It 'should fail' {

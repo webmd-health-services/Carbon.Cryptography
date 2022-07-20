@@ -1,4 +1,30 @@
 
+# 3.0.0
+
+## Upgrade Instructions
+
+It turns out, PowerShell doesn't find and auto-load modules that use the `DefaultCommandPrefix` setting. So, we've 
+removed `Carbon.Cryptography` module's `DefaultCommandPrefix` and explicitly added a `C` prefix to all commands. 
+
+To upgrade, find any place where you are importing this module, and if you are explicitly importing functions using the
+`Import-Module` command's `-Function` parameter, add the `C` prefix to each command. For example, if you were importing
+like this:
+
+    Import-Module -Name 'Carbon.Cryptography' -Function @('Get-Certificate', 'Install-Certificate')
+
+you would change it to:
+
+    Import-Module -Name 'Carbon.Cryptography' -Function @('Get-CCertificate', 'Install-CCertificate')
+
+If you have automation that installs modules with `Install-Module`, you may need to add the `-AllowClobber` switch if
+you've got previous versions of Carbon.Cryptography or Carbon installed.
+
+## Changes
+
+Added a `C` prefix to each command and removed the `DefaultCommandPrefix`. PowerShell won't auto-load a module that uses
+a default command prefix and you call the command with the prefix.
+
+
 # 2.3.0
 
 * Added `Find-CCertificate` function for finding certificates by searching subjects, start/end dates, private keys,

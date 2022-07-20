@@ -81,19 +81,19 @@ BeforeAll {
 
         $script:result | ForEach-Object -MemberName 'Subject' | Should -Be $CertificatesWithSubjects
 
-        Assert-MockCalled -CommandName 'Get-Certificate' `
+        Assert-MockCalled -CommandName 'Get-CCertificate' `
                           -ModuleName 'Carbon.Cryptography' `
                           -ParameterFilter { $StoreName -eq $In }
 
         if( $For )
         {
-            Assert-MockCalled -CommandName 'Get-Certificate' `
+            Assert-MockCalled -CommandName 'Get-CCertificate' `
                               -ModuleName 'Carbon.Cryptography' `
                               -ParameterFilter { $StoreLocation -eq $For }
         }
         else
         {
-            Assert-MockCalled -CommandName 'Get-Certificate' `
+            Assert-MockCalled -CommandName 'Get-CCertificate' `
                               -ModuleName 'Carbon.Cryptography' `
                               -ParameterFilter { $null -eq $StoreLocation }
         }
@@ -107,7 +107,7 @@ BeforeAll {
         )
         $installedCertificates = $script:mockedCertificates
 
-        Mock -CommandName 'Get-Certificate' `
+        Mock -CommandName 'Get-CCertificate' `
              -ModuleName 'Carbon.Cryptography' `
              -MockWith { $installedCertificates }.GetNewClosure()
 
@@ -115,7 +115,7 @@ BeforeAll {
     }
 }
 
-Describe 'Find-Certificate' {
+Describe 'Find-CCertificate' {
     BeforeEach {
         $script:mockedCertificates = [Collections.ArrayList]::New()
         $script:result = $null

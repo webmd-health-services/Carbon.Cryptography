@@ -110,7 +110,7 @@ BeforeAll {
 
         $installedCertificates = $script:mockedCertificates
 
-        Mock -CommandName 'Get-Certificate' `
+        Mock -CommandName 'Get-CCertificate' `
             -ModuleName 'Carbon.Cryptography' `
             -MockWith { $installedCertificates }.GetNewClosure()
 
@@ -129,7 +129,7 @@ BeforeAll {
     }
 }
 
-Describe 'Find-TlsCertificate' {
+Describe 'Find-CTlsCertificate' {
     BeforeEach {
         $Global:Error.Clear()
         $script:foundCert = $null

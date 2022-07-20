@@ -1,5 +1,5 @@
 
-function Get-Certificate
+function Get-CCertificate
 {
     <#
     .SYNOPSIS

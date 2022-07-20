@@ -1,5 +1,5 @@
 
-function Find-Certificate
+function Find-CCertificate
 {
     <#
     .SYNOPSIS
@@ -60,7 +60,7 @@ function Find-Certificate
     Set-StrictMode -Version 'Latest'
     Use-CallerPreference -Cmdlet $PSCmdlet -Session $ExecutionContext.SessionState
 
-    Write-Verbose 'Find-Certificate search criteria:'
+    Write-Verbose 'Find-CCertificate search criteria:'
     if( $Subject )
     {
         Write-Verbose ("  Subject        like  $($Subject)")
@@ -230,7 +230,7 @@ function Find-Certificate
         $getCertArgs['StoreLocation'] = $StoreLocation
     }
 
-    $certs = Get-Certificate @getCertArgs -StoreName $StoreName
+    $certs = Get-CCertificate @getCertArgs -StoreName $StoreName
     $isFirstCert = $true
     foreach( $certificate in $certs )
     {

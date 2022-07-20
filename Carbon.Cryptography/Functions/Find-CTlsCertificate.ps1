@@ -1,5 +1,5 @@
 
-function Find-TlsCertificate
+function Find-CTlsCertificate
 {
     <#
     .SYNOPSIS
@@ -98,7 +98,7 @@ function Find-TlsCertificate
     }
 
     $certificate =
-        Find-Certificate -HostName $HostName `
+        Find-CCertificate -HostName $HostName `
                          -Active `
                          -HasPrivateKey `
                          -KeyUsageName 'Server Authentication' `

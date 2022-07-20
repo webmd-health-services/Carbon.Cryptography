@@ -1,5 +1,5 @@
 
-function Install-Certificate
+function Install-CCertificate
 {
     <#
     .SYNOPSIS
@@ -319,7 +319,7 @@ function Install-Certificate
         {
             $storeParam = @{ CustomStoreName = $CustomStoreName }
         }
-        return Get-Certificate -Thumbprint $thumbprint -StoreLocation $StoreLocation @storeParam
+        return Get-CCertificate -Thumbprint $thumbprint -StoreLocation $StoreLocation @storeParam
     }
 }
 
