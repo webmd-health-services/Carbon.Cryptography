@@ -208,9 +208,12 @@ function New-CRsaKeyPair
 
     try
     {
-        $certReqPath = Get-Command -Name 'certreq.exe' | Select-Object -ExpandProperty 'Path'
+        $certReqPath = Get-Command -Name 'certreq.exe' -ErrorAction Ignore | Select-Object -ExpandProperty 'Path'
         if( -not $certReqPath )
         {
+            'Command "certreq.exe" does not exist. This is a Windows-only command. If you''re on Windows, make sure ' +
+            '"C:\Windows\System32" is part of your "Path" environment variable.' |
+                Write-Error -ErrorAction $ErrorActionPreference
             return
         }
 
