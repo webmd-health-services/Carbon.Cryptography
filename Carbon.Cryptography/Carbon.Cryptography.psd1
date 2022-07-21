@@ -83,6 +83,7 @@
         'Find-CTlsCertificate',
         'Get-CCertificate',
         'Install-CCertificate',
+        'New-CRsaKeyPair',
         'Protect-CString',
         'Uninstall-CCertificate',
         'Unprotect-CString'

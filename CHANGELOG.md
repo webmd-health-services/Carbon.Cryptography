@@ -3,6 +3,8 @@
 
 ## Upgrade Instructions
 
+### From Previous Versions of Carbon.Cryptography
+
 It turns out, PowerShell doesn't find and auto-load modules that use the `DefaultCommandPrefix` setting. So, we've 
 removed `Carbon.Cryptography` module's `DefaultCommandPrefix` and explicitly added a `C` prefix to all commands. 
 
@@ -19,10 +21,41 @@ you would change it to:
 If you have automation that installs modules with `Install-Module`, you may need to add the `-AllowClobber` switch if
 you've got previous versions of Carbon.Cryptography or Carbon installed.
 
+### From Carbon
+
+Add a `-KeyUsage DocumentEncryption` argument to usages of `New-CRsaKeyPair`. The `KeyUsage` parameter was added and if
+not given, `New-CRsaKeyPair` generates a key pair with no key usages or enhanced key usages. To create a key pair for
+speific usages, valid usages are `ClientAuthentication`, `CodeSigning`, `DocumentEncryption`, `DocumentSigning`, and
+`ServerAuthentication`.
+
+Remove all usages of the `New-CRsaKeyPair` function's `ValidFrom` and `Authority` parameters. They were removed.
+
+`New-CRsaKeyPair` used to return two `[IO.FileInfo]` objects: the generated public key and private key. It now returns
+one object that has `PublicKeyFile` and `PrivateKeyFile` properties instead. Update usages.
+
+## Added
+
+* Copied the `New-CRsaKeyPair` function from Carbon. This function generates a public/private key pair suitable for
+document encryption, including in DSC resources and PowerShell's CMS message cmdlets.
+* Added anew `KeyUsage` parameter to `New-CRsaKeyPair`. When not given, certificates with no key usages or enhanced key
+usages are created. Pass the key's usages to this parameter. Valid usages are `ClientAuthentication`, `CodeSigning`,
+`DocumentEncryption`, `DocumentSigning`, and `ServerAuthentication`.
+
 ## Changes
 
-Added a `C` prefix to each command and removed the `DefaultCommandPrefix`. PowerShell won't auto-load a module that uses
+* Added a `C` prefix to each command and removed the `DefaultCommandPrefix`. PowerShell won't auto-load a module that uses
 a default command prefix and you call the command with the prefix.
+* The `New-CRsaKeyPair` default parameter set creates a key pair with no key usages or enhanced key usages. Previous
+versions created a key pair for document encryption. To get previous default behavior, add
+`-KeyUsage DocumentEncryption` argument to all `New-CRsaKeyPair` usages.
+* The `NewCRsaKeyPair` function no longer returns two `IO.FileInfo` objects for the public and private key files.
+Instead, it returns an object with `PrivateKeyFile` and `PublicKeyFile` properties, which are `[IO.FileInfo]` objects
+for the public and private key, respectively.
+
+## Fixes
+
+* Fixed: `New-CRsaKeyPair` function fails when public/private key files already exist, even if using the `-Force`
+parameter.
 
 
 # 2.3.0
