@@ -32,7 +32,7 @@ function ThenFailed
     }
 }
 
-Describe 'Uninstall-Certificate' {
+Describe 'Uninstall-CCertificate' {
 
     It 'should remove certificate by certificate' {
         Init
@@ -211,7 +211,7 @@ function ThenCertificateUninstalled
     $certs | Should -BeNullOrEmpty
 }
 
-Describe 'Uninstall-Certificate.when given just the certificate thumbprint' {
+Describe 'Uninstall-CCertificate.when given just the certificate thumbprint' {
     It 'should find and uninstall the certificate' {
         Init
         GivenAnInstalledCertificate
@@ -220,7 +220,7 @@ Describe 'Uninstall-Certificate.when given just the certificate thumbprint' {
     }
 }
 
-Describe 'Uninstall-Certificate.when given just the certificate thumbprint and installed in multiple stores' {
+Describe 'Uninstall-CCertificate.when given just the certificate thumbprint and installed in multiple stores' {
     It 'should find and uninstall the certificate from all stores' {
         Init
         GivenAnInstalledCertificate -StoreLocation 'CurrentUser' -StoreName 'My'
@@ -235,7 +235,7 @@ Describe 'Uninstall-Certificate.when given just the certificate thumbprint and i
     }
 }
 
-Describe 'Uninstall-Certificate.when piped thumbprint' {
+Describe 'Uninstall-CCertificate.when piped thumbprint' {
     It 'should uninstall the certificate with that thumbprint' {
         Init
         GivenAnInstalledCertificate
@@ -244,7 +244,7 @@ Describe 'Uninstall-Certificate.when piped thumbprint' {
     }
 }
 
-Describe 'Uninstall-Certificate.when piped certificate object' {
+Describe 'Uninstall-CCertificate.when piped certificate object' {
     It 'should uninstall that certificate' {
         Init
         GivenAnInstalledCertificate
@@ -253,7 +253,7 @@ Describe 'Uninstall-Certificate.when piped certificate object' {
     }
 }
 
-Describe 'Uninstall-Certificate.when piped multiple thumbprints' {
+Describe 'Uninstall-CCertificate.when piped multiple thumbprints' {
     It 'should uninstall all the certificates' {
         Init
         GivenAnInstalledCertificate

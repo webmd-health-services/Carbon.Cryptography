@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
-**INTERNAL. DO NOT USE** Standalone wrapper script for Carbon's `Unprotect-String` function to make it easier to decrypt a string as a custom user.
+**INTERNAL. DO NOT USE** Standalone wrapper script for Carbon's `Unprotect-CString` function to make it easier to decrypt a string as a custom user.
 #>
 param(
     [Parameter(Mandatory)]
-    # A base64 encoded string that was protected with Carbon's `protect-String`.
+    # A base64 encoded string that was protected with Carbon's `Protect-CString`.
     [String]$ProtectedString
 )
 

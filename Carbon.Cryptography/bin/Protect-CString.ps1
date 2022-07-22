@@ -22,7 +22,7 @@ param(
 Set-StrictMode -Version 'Latest'
 
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\Carbon.Cryptography.psd1' -Resolve) `
-              -Function @('Unprotect-String', 'Protect-String')
+              -Function @('Unprotect-CString', 'Protect-CString')
 
 $string = Unprotect-CString -ProtectedString $ProtectedString
 Protect-CString -String $string -ForUser

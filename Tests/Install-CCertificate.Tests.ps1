@@ -227,7 +227,7 @@ foreach( $location in @('CurrentUser', 'LocalMachine') )
         $notMsg = 'not '
     }
 
-    Describe "Install-Certificate.$($location).when installing from a file" {
+    Describe "Install-CCertificate.$($location).when installing from a file" {
         AfterEach { Reset }
         It "should $($notMsg)install certificate" -Skip:$skip {
             Init
@@ -251,7 +251,7 @@ foreach( $location in @('CurrentUser', 'LocalMachine') )
         }
     }
 
-    Describe "Install-Certificate.$($location).when installing from a file with relative path" {
+    Describe "Install-CCertificate.$($location).when installing from a file with relative path" {
         It "should $($notMsg)install certificate" -Skip:$skip {
             Init
             Push-Location -Path $PSScriptRoot
@@ -278,7 +278,7 @@ foreach( $location in @('CurrentUser', 'LocalMachine') )
         }
     }
 
-    Describe "Install-Certificate.$($location).when installing as exportable" {
+    Describe "Install-CCertificate.$($location).when installing as exportable" {
         It "should $($notMsg)install certificate as exportable" -Skip:$skip {
             Init
             WhenInstalling -FromFile $testCertPath -For $location -In 'My' -ThatIsExportable @errorActionParam
@@ -296,7 +296,7 @@ foreach( $location in @('CurrentUser', 'LocalMachine') )
         }
     }
 
-    Describe "Install-Certificate.$($location).when installing from certificate object" {
+    Describe "Install-CCertificate.$($location).when installing from certificate object" {
         It "should $($notMsg)install certificate" -Skip:$skip {
             Init
             WhenInstalling $testCert -For $location -In 'My' @errorActionParam
@@ -310,7 +310,7 @@ foreach( $location in @('CurrentUser', 'LocalMachine') )
         }
     }
 
-    Describe "Install-Certificate.$($location).when installing from password-protected file" {
+    Describe "Install-CCertificate.$($location).when installing from password-protected file" {
         It "should $($notMsg)install password protected certificate" -Skip:$skip {
             Init
             $fileCount = Measure-PhysicalStore -Location $location
@@ -331,7 +331,7 @@ foreach( $location in @('CurrentUser', 'LocalMachine') )
         }
     }
 
-    Describe "Install-Certificate.$($location).when installing in remote computer" {
+    Describe "Install-CCertificate.$($location).when installing in remote computer" {
         It "should $($notMsg)install certificate" -Skip:($skip -or -not (Test-Remoting -IsAvailable)) {
             Init
             [int32]$timeout = [TimeSpan]::New(0, 0, 10).TotalMilliseconds
@@ -356,7 +356,7 @@ foreach( $location in @('CurrentUser', 'LocalMachine') )
         }
     }
 
-    Describe "Install-Certificate.$($location).when using WhatIf" {
+    Describe "Install-CCertificate.$($location).when using WhatIf" {
         It 'should not install certificate' -Skip:$skip {
             Init
             WhenInstalling -FromFile $testCertPath -For $location -In 'My' -WhatIf @errorActionParam
@@ -374,7 +374,7 @@ foreach( $location in @('CurrentUser', 'LocalMachine') )
         }
     }
 
-    Describe "Install-Certificate.$($location).when certificate is already installed" {
+    Describe "Install-CCertificate.$($location).when certificate is already installed" {
         AfterEach { Reset }
         It 'should not re-install it' -Skip:$skip {
             $fileCount = Measure-PhysicalStore -Location $location
@@ -410,7 +410,7 @@ foreach( $location in @('CurrentUser', 'LocalMachine') )
         }
     }
 
-    Describe "Install-Certificate.$($location).when certificate is already installed and forcing install" {
+    Describe "Install-CCertificate.$($location).when certificate is already installed and forcing install" {
         AfterEach { Reset }
         It 'should not re-install it' -Skip:$skip {
             $fileCount = Measure-PhysicalStore -Location $location
@@ -448,7 +448,7 @@ foreach( $location in @('CurrentUser', 'LocalMachine') )
         }
     }
 
-    Describe "Install-Certificate.$($location).when requesting the installed certificate be returned" {
+    Describe "Install-CCertificate.$($location).when requesting the installed certificate be returned" {
         AfterEach { Reset }
         Context 'certificate is not installed' {
             It "should $($notMsg)return the certificate" -Skip:$skip {
@@ -478,7 +478,7 @@ foreach( $location in @('CurrentUser', 'LocalMachine') )
             }
         }
     }
-    Describe "Install-Certificate.$($location).when installing in custom store" {
+    Describe "Install-CCertificate.$($location).when installing in custom store" {
         AfterEach { Reset }
         It "should $($notMsg)install certificate in the custom store" -Skip:$skip {
             Init

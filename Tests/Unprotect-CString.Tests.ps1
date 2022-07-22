@@ -16,7 +16,7 @@ $rsaCipherText = Protect-CString -String $secret -PublicKeyPath $privateKeyPath
 
 function Reset
 {
-    # Uninstall-Certificate only works on Windows
+    # Uninstall-CCertificate only works on Windows
     if( -not (Test-TCOperatingSystem -IsWindows) )
     {
         return
@@ -41,7 +41,7 @@ function Reset
     }
 }
 
-Describe 'Unprotect-String' {
+Describe 'Unprotect-CString' {
     BeforeEach {
         $Global:Error.Clear()
     }
@@ -194,7 +194,7 @@ Describe 'Unprotect-String' {
     }
 }
 
-Describe 'Unprotect-String.AES' {
+Describe 'Unprotect-CString.AES' {
     It 'should fail on invalid key length' {
         $key = ConvertTo-SecureString ('a' * 8) -AsPlainText -Force
         { Protect-CString -String 'text' -Key $key -ErrorAction Stop } |
@@ -214,7 +214,7 @@ Describe 'Unprotect-String.AES' {
     }
 }
 
-Describe 'Unprotect-String.when user does not have access to private key' {
+Describe 'Unprotect-CString.when user does not have access to private key' {
     It 'should fail' {
         $cert = Get-CCertificate -Path $privateKeyPath
         $cert | Add-member -MemberType NoteProperty -Name 'PrivateKey' -Value $null -Force
@@ -225,7 +225,7 @@ Describe 'Unprotect-String.when user does not have access to private key' {
     }
 }
 
-Describe 'Unprotect-String.when decryption fails' {
+Describe 'Unprotect-CString.when decryption fails' {
     if( (Test-TCOperatingSystem -IsWindows) )
     {
         Context 'DPAPI' {

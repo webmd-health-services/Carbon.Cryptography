@@ -10,7 +10,7 @@ Build:
 - Exec:
       OnlyBy: BuildServer
       Path: appveyor
-      Argument: [ UpdateBuild, -Version, $(WHISKEY_SEMVER2) ]
+      Argument: [ UpdateBuild, -Version, "$(WHISKEY_SEMVER2)+$(WHISKEY_BUILD_NUMBER)" ]
 
 # Dot-sourcing files is expensive. Move all functions into .psm1 file to improve import speed. Do this before testing
 # to ensure the module still works.
@@ -77,27 +77,40 @@ Build:
             Path: Tests\*.Tests.ps1
             ExcludePath:
             - "*\\Carbon.Cryptography.Tests.ps1"
-            - "*\\Convert-SecureStringToString.Tests.ps1"
-            - "*\\Find-TlsCertificate.Tests.ps1"
-            - "*\\Get-Certificate.Tests.ps1"
+            - "*\\Convert-CSecureStringToString.Tests.ps1"
+            - "*\\Find-CTlsCertificate.Tests.ps1"
+            - "*\\Get-CCertificate.Tests.ps1"
             - "*\\Import-Carbon.Cryptography.Tests.ps1"
-            - "*\\Install-Certificate.Tests.ps1"
-            - "*\\Protect-String.Tests.ps1"
-            - "*\\Uninstall-Certificate.Tests.ps1"
-            - "*\\Unprotect-String.Tests.ps1"
-            Exit: true
+            - "*\\Install-CCertificate.Tests.ps1"
+            - "*\\New-CRsaKeyPair.Tests.ps1"
+            - "*\\Protect-CString.Tests.ps1"
+            - "*\\Uninstall-CCertificate.Tests.ps1"
+            - "*\\Unprotect-CString.Tests.ps1"
+            Throw: true
         TestResult:
             Enabled: true
             OutputPath: .output\pester5.xml
         Output: Detailed
 
+- Pester:
+    # Because the DSC resource in the test is resolved during parsing not execution.
+    OnlyOnPlatform: Windows
+    Configuration:
+        Run:
+            Path: Tests\New-CRsaKeyPair.Tests.ps1
+            Throw: true
+        TestResult:
+            Enabled: true
+            OutputPath: .output\pester5-new-crsakeypair.xml
+        Output: Detailed
+
 - Pester4:
     Script:
     - Tests\Carbon.Cryptography.Tests.ps1
-    - Tests\Convert-SecureStringToString.Tests.ps1
-    - Tests\Get-Certificate.Tests.ps1
+    - Tests\Convert-CSecureStringToString.Tests.ps1
+    - Tests\Get-CCertificate.Tests.ps1
     - Tests\Import-Carbon.Cryptography.Tests.ps1
-    - Tests\Install-Certificate.Tests.ps1
-    - Tests\Protect-String.Tests.ps1
-    - Tests\Uninstall-Certificate.Tests.ps1
-    - Tests\Unprotect-String.Tests.ps1
+    - Tests\Install-CCertificate.Tests.ps1
+    - Tests\Protect-CString.Tests.ps1
+    - Tests\Uninstall-CCertificate.Tests.ps1
+    - Tests\Unprotect-CString.Tests.ps1

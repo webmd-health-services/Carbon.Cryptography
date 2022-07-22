@@ -51,35 +51,11 @@ for:
     only:
     - job_group: ps
   build_script:
-  - ps: |
-      # Must do this in background otherwise old PackageManagement assembly gets loaded which causes various problems.
-      $job = Start-Job {
-          Set-PSRepository -Name 'PSGallery' -InstallationPolicy Trusted
-          Install-Module -Name 'Prism'
-        }
-      # Waiting for job to complete (with `Receive-Job -Wait`) hangs sometimes on Ubuntu
-      while( -not (Get-Module -Name 'Prism' -ListAvailable) )
-      {
-        Start-Sleep -Milliseconds 100
-      }
-
-      .\build.ps1
+  - ps: .\build.ps1
 
 # Build in PowerShell
 - matrix:
     only:
     - job_group: pwsh
   build_script:
-  - pwsh: |
-      # Must do this in background otherwise old PackageManagement assembly gets loaded which causes various problems.
-      $job = Start-Job {
-          Set-PSRepository -Name 'PSGallery' -InstallationPolicy Trusted
-          Install-Module -Name 'Prism'
-        }
-      # Waiting for job to complete (with `Receive-Job -Wait`) hangs sometimes on Ubuntu
-      while( -not (Get-Module -Name 'Prism' -ListAvailable) )
-      {
-        Start-Sleep -Milliseconds 100
-      }
-
-      ./build.ps1
+  - pwsh: ./build.ps1

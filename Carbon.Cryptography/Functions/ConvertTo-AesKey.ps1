@@ -22,7 +22,7 @@ function ConvertTo-AesKey
         $bytesKey = $false
         if( $InputObject -is [SecureString] )
         {
-            $unicodeKey = Convert-SecureStringToByte -SecureString $InputObject
+            $unicodeKey = Convert-CSecureStringToByte -SecureString $InputObject
             try
             {
                 # SecureString is two bytes per char. We need an encoding that is typically one byte per char, otherwise
