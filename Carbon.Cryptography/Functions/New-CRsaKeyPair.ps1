@@ -13,14 +13,15 @@ function New-CRsaKeyPair
     private keys saved to the `PublicKeyPath` and `PrivateKeyPath` parameters, respectively. `New-CRsaKeyPair` creates
     a temporary .inf file and passes it to the `certreq.exe` program. You will be prompted for a password, unless you
     pass a password to the `Password` parameter.
-    
+
     By default, a key pair with no key usages or enhanced key usages is generated that is 4096 bits in length, uses
     `SHA512` as the signature/hash algorithm, and is valid until December 31st, 9999. An object with
     `[IO.FileInfo] PublicKeyFile` and `[IO.FileInfo] PrivateKeyFile` properties is returned.
 
-    You can change the key's length, algorithm, and expiration data with the `Length`, `Algorithm`, and `ValidTo`
-    parameters. You can set the key pair's usages with the `KeyUsage` parameter. Valid usages this function supports
-    are `ClientAuthentication`, `CodeSigning`, `DocumentEncryption`, `DocumentSigning`, and `ServerAuthentication`.
+    You can change the key's length, algorithm, expiration date, and provider with the `Length`, `Algorithm`, `ValidTo`,
+    and `ProviderName` parameters, respectively. You can set the key pair's usages with the `KeyUsage` parameter. Valid
+    usages this function supports are `ClientAuthentication`, `CodeSigning`, `DocumentEncryption`, `DocumentSigning`,
+    and `ServerAuthentication`.
 
     If the destination files already exist, you'll get an error and no keys will be generated. Use the `Force` switch to
     overwrite any existing files.
@@ -54,10 +55,11 @@ function New-CRsaKeyPair
     `$null`. This functionality was introduced in Carbon 2.1.
 
     .EXAMPLE
-    New-CRsaKeyPair -Subject 'CN=MyName' -PublicKeyFile 'MyName.cer' -PrivateKeyFile 'MyName.pfx' -Algorithm 'sha1' -ValidTo (Get-Date -Year 2015 -Month 12 -Day 31) -Length 1024 -Password $secureString -KeyUsage DocumentSigning, DocumentEncryption
+    New-CRsaKeyPair -Subject 'CN=MyName' -PublicKeyFile 'MyName.cer' -PrivateKeyFile 'MyName.pfx' -Algorithm 'sha1' -ValidTo (Get-Date -Year 2015 -Month 12 -Day 31) -Length 1024 -Password $secureString -KeyUsage DocumentSigning, DocumentEncryption -ProviderName 'Microsoft AES Cryptographic Provider'
 
     Demonstrates how to use all the parameters to create a truly customized key pair. The generated certificate will use
-    the sha1 signing algorithm, expires 12/31/2015, is 1024 bits in length, and can be used to sign and encrypt.
+    the sha1 signing algorithm, expires 12/31/2015, is 1024 bits in length, uses the "Microsoft AES Cryptographic
+    Provider", and can be used to sign and encrypt.
     #>
     [CmdletBinding()]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingUserNameAndPassWordParams', '')]
@@ -82,6 +84,12 @@ function New-CRsaKeyPair
         [ValidateSet('ClientAuthentication', 'CodeSigning', 'DocumentEncryption', 'DocumentSigning',
                      'ServerAuthentication')]
         [String[]] $KeyUsage,
+
+        # The display name of the Cryptographic Service Provider (CSP) to use. The default is "Microsoft Enhanced RSA
+        # and AES Cryptographic Provider" (i.e. "Microsoft RSA Cryptographic Provider"). Run `certutil -csplist` to see
+        # providers available on your system and [Microsoft Cryptographic Service Providers](https://learn.microsoft.com/en-us/windows/win32/seccrypto/microsoft-cryptographic-service-providers)
+        # for more documentation.
+        [String] $ProviderName = 'Microsoft Enhanced RSA and AES Cryptographic Provider',
 
         # The file where the public key should be stored. Saved as an X509 certificate.
         [Parameter(Mandatory, Position=1)]
@@ -169,7 +177,7 @@ function New-CRsaKeyPair
     # * https://omvs.de/2019/11/13/key-usage-extensions-at-x-509-certificates/
     # CERT_DIGITAL_SIGNATURE_KEY_USAGE (0x80/128):
     #   The key can be used as a digital signature. The key is used with a Digital Signature Algorithm (DSA) to support
-    #   services other than nonrepudiation, certificate signing, or revocation list signing. 
+    #   services other than nonrepudiation, certificate signing, or revocation list signing.
     # CERT_NON_REPUDIATION_KEY_USAGE (0x40/64):
     #   The key can be used for authentication. The key is used to verify a digital signature as part of a
     #   nonrepudiation service that protects against false denial of action by a signing entity.
@@ -279,7 +287,7 @@ function New-CRsaKeyPair
             $extensionsLine = $extensions -join "%,""$([Environment]::NewLine)_continue_ = ""%"
             $extensionsLine = "%szOID_ENHANCED_KEY_USAGE% = ""{text}%$($extensionsLine)%"""
         }
-        
+
         @"
 [Version]
 Signature = "`$Windows NT`$"
@@ -303,6 +311,7 @@ Exportable = true
 RequestType = Cert
 ValidityPeriod = Days
 ValidityPeriodUnits = $($daysValid)
+ProviderName = $($ProviderName)
 $($keyUsageLine)
 
 [Extensions]
@@ -317,7 +326,7 @@ $($extensionsLine)
             $forceArg = ' -f'
         }
         Write-Debug "& ""$($certReqPath)"" -q$($forceArg) -new ""$($tempInfFile)"" ""$($PublicKeyFile)"""
-        $output = & $certReqPath -q ($forceArg.TrimStart()) -new $tempInfFile $PublicKeyFile 
+        $output = & $certReqPath -q ($forceArg.TrimStart()) -new $tempInfFile $PublicKeyFile
         if( $LASTEXITCODE -or -not (Test-Path -Path $PublicKeyFile -PathType Leaf) )
         {
             Write-Error ('Failed to create public/private key pair:{0}{1}' -f ([Environment]::NewLine),($output -join ([Environment]::NewLine)))

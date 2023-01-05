@@ -1,9 +1,9 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -30,7 +30,8 @@ BeforeAll {
             $Length = 4096,
             [datetime]
             $ValidTo,
-            $Algorithm = 'sha512RSA'
+            $Algorithm = 'sha512RSA',
+            $ProviderName = 'Microsoft Enhanced RSA and AES Cryptographic Provider'
         )
 
         Set-StrictMode -Version 'Latest'
@@ -50,12 +51,28 @@ BeforeAll {
         $cert.PublicKey.Key.KeySize | Should -Be $Length
         $cert.PublicKey.Key.KeyExchangeAlgorithm | Should -BeLike 'RSA*'
         $cert.SignatureAlgorithm.FriendlyName | Should -Be $Algorithm
+
+        $privateCert = Install-CCertificate -Path $script:privateKeyPath `
+                                            -Password $script:privateKeyPassword `
+                                            -StoreLocation CurrentUser `
+                                            -StoreName My `
+                                            -PassThru
+        $privateCert.HasPrivateKey | Should -BeTrue
+        $privateCert.PrivateKey | Should -Not -BeNullOrEmpty
+        if ($privateCert.PrivateKey | Get-Member -Name 'CspKeyContainerInfo')
+        {
+            $privateCert.PrivateKey.CspKeyContainerInfo.ProviderName | Should -Be $ProviderName
+        }
+        else
+        {
+            $privateCert.PrivateKey.Key.Provider | Should -Be $ProviderName
+        }
     }
 
     function ThenKeyPairCreated
     {
         param(
-            [String[]] $WithKeyUsage = @(),
+            [String[]] $WithKeyUsage = @('DigitalSignature'),
             [String[]] $WithEnhancedKeyUsage = @()
         )
 
@@ -65,7 +82,7 @@ BeforeAll {
         $cert = Get-CCertificate -Path $script:publicKeyPath
         if( $WithKeyUsage )
         {
-            $actualKeyUsage = 
+            $actualKeyUsage =
                 $cert.Extensions |
                 Where-Object { $_.Oid.FriendlyName -eq 'Key Usage' } |
                 Select-Object -ExpandProperty 'KeyUsages' |
@@ -136,16 +153,17 @@ BeforeAll {
 
 Describe 'New-CRsaKeyPair' -Skip:(-not (Get-Command -Name 'certreq.exe' -ErrorAction Ignore)) {
     BeforeEach {
-        $script:testDir = Join-Path -Path $TestDrive -ChildPath ($script:testNum++)
+        $script:testDir = Join-Path -Path $TestDrive -ChildPath $script:testNum
         $Global:Error.Clear()
 
-        $script:subject = 'CN={0}' -f [Guid]::NewGuid()
+        $script:subject = "CN=$($PSCommandPath | Split-Path -Leaf)$($script:testNum)"
         $script:publicKeyPath = Join-Path -Path $script:testDir -ChildPath 'public.cer'
         $script:privateKeyPath = Join-Path -Path $script:testDir -ChildPath 'private.pfx'
         $script:output = $null
     }
 
     AfterEach {
+        $script:testNum += 1
         Copy-Item $script:publicKeyPath -Destination $PSScriptRoot -ErrorAction Ignore
         Copy-Item $script:privateKeyPath -Destination $PSScriptRoot -ErrorAction Ignore
         [pscredential]::New('user', $script:privateKeyPassword).GetNetworkCredential().Password |
@@ -253,7 +271,8 @@ Describe 'New-CRsaKeyPair' -Skip:(-not (Get-Command -Name 'certreq.exe' -ErrorAc
             ValidTo = $validTo;
             Length = $length;
             Algorithm = 'sha1';
-            KeyUsage = 'DocumentEncryption'
+            KeyUsage = 'DocumentEncryption';
+            ProviderName = 'Microsoft Enhanced Cryptographic Provider v1.0'
         }
 
         WhenCreatingKeyPair -WithArgument $withArgs
@@ -261,7 +280,10 @@ Describe 'New-CRsaKeyPair' -Skip:(-not (Get-Command -Name 'certreq.exe' -ErrorAc
                            -WithEnhancedKeyUsage 'Document Encryption'
         ThenReturnedKeyPairInfo
         ThenNotInCertStore
-        Assert-KeyProperty -Length $length -ValidTo $validTo -Algorithm 'sha1RSA'
+        Assert-KeyProperty -Length $length `
+                           -ValidTo $validTo `
+                           -Algorithm 'sha1RSA' `
+                           -ProviderName $withArgs['ProviderName']
     }
 
     It 'should reject subjects that don''t begin with CN=' {
@@ -343,7 +365,7 @@ Describe 'New-CRsaKeyPair' -Skip:(-not (Get-Command -Name 'certreq.exe' -ErrorAc
         New-Item -Path $script:testDir -ItemType 'Directory' -Force
         New-Item -Path $script:publicKeyPath
         New-Item -Path $script:privateKeyPath
-        WhenCreatingKeyPair -WithArgument @{ Force = $true }
+        WhenCreatingKeyPair -WithArgument @{ ProviderName = 'Microsoft Strong Cryptographic Provider' ; Force = $true }
         ThenKeyPairCreated
         ThenReturnedKeyPairInfo
         ThenNotInCertStore
