@@ -17,7 +17,7 @@
     RootModule = 'Carbon.Cryptography.psm1'
 
     # Version number of this module.
-    ModuleVersion = '3.0.0'
+    ModuleVersion = '3.1.0'
 
     # ID used to uniquely identify this module
     GUID = '225b9f63-3e3e-406c-87a0-33d34f30cd8e'
@@ -119,7 +119,7 @@
         PSData = @{
 
             # Tags applied to this module. These help with module discovery in online galleries.
-            Tags = @( 
+            Tags = @(
                 'Desktop', 'Core', 'Carbon', 'security', 'convert', 'securestring', 'string', 'certificate',
                 'certificates', 'x509', 'x509certificate', 'x509certificates', 'install', 'uninstall', 'encrypt',
                 'decrypt', 'aes', 'rsa', 'protect', 'unprotect', 'crypto', 'cryptography', 'dpapi', 'key', 'public-key',
