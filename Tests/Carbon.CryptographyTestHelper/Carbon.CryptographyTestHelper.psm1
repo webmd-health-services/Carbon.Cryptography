@@ -1,4 +1,9 @@
 
+$psModulesRoot = Join-Path -Path $PSScriptRoot -ChildPath '..\..\Carbon.Cryptography\PSModules' -Resolve
+
+Import-Module -Name (Join-Path -Path $psModulesRoot -ChildPath 'Carbon.Core' -Resolve) `
+              -Function ('Test-COperatingSystem')
+
 function Get-TestUserCredential
 {
     param(
@@ -57,7 +62,7 @@ function New-MockCertificate
         ForEach-Object { [pscustomobject]@{ 'FriendlyName' = '' ; 'ObjectId' = $_; } } |
         ForEach-Object { [void]$keyUsages.Add($_) }
 
-    
+
     $certificate = [pscustomobject]@{
         'Thumbprint' = $Thumbprint;
         'Subject' = $Subject;
@@ -92,12 +97,12 @@ function Test-TCertificate
 
     if( $MustBeExportable )
     {
-        return (Test-TCOperatingSystem -MacOS)
+        return (Test-COperatingSystem -MacOS)
     }
 
     if( $AutomaticallyExportable )
     {
-        return (Test-TCOperatingSystem -Linux)
+        return (Test-COperatingSystem  -Linux)
     }
 }
 
@@ -117,7 +122,7 @@ function Test-CustomStore
 
     if( $IsReadOnly )
     {
-        if( (Test-TCOperatingSystem -Windows) -and -not (Test-IsAdministrator) )
+        if( (Test-COperatingSystem -Windows) -and -not (Test-IsAdministrator) )
         {
             return $true
         }
@@ -125,7 +130,7 @@ function Test-CustomStore
         return $false
     }
 
-    if( (Test-TCOperatingSystem -Windows) )
+    if( (Test-COperatingSystem -Windows) )
     {
         return $true
     }
@@ -140,13 +145,13 @@ function Test-FriendlyName
         [switch] $IsSupported
     )
 
-    return (Test-TCOperatingSystem -IsWindows)
+    return (Test-COperatingSystem -IsWindows)
 }
 
 # When the Carbon.Accounts PowerShell module gets created, use the Test-CAdminPrivilege from that module instead.
 function Test-IsAdministrator
 {
-    if( (Test-TCOperatingSystem -IsWindows) )
+    if( (Test-COperatingSystem -IsWindows) )
     {
         [Security.Principal.WindowsPrincipal]$currentIdentity =[Security.Principal.WindowsIdentity]::GetCurrent()
         return $currentIdentity.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -157,7 +162,7 @@ function Test-IsAdministrator
     {
         return (id -u) -eq 0
     }
-    
+
     Write-Error -Message ('Unable to determine on the current operating system if the current user has admin rights.') `
                 -ErrorAction Stop
 }
@@ -173,7 +178,7 @@ function Test-LocalMachineStore
 
     if( $IsReadOnly )
     {
-        return -not (Test-TCOperatingSystem -Windows)
+        return -not (Test-COperatingSystem -Windows)
     }
 }
 
@@ -193,7 +198,7 @@ function Test-MyStore
         return $true
     }
 
-    if( (Test-TCOperatingSystem -Linux) )
+    if( (Test-COperatingSystem -Linux) )
     {
         return $false
     }
@@ -209,7 +214,7 @@ function Test-PhysicalStore
         [switch] $IsReadable
     )
 
-    return (Test-TCOperatingSystem -IsWindows)
+    return (Test-COperatingSystem -IsWindows)
 }
 
 function Test-Remoting
@@ -220,7 +225,7 @@ function Test-Remoting
         [switch] $IsAvailable
     )
 
-    return -not (Test-RunningUnderBuildServer) -and (Test-TCOperatingSystem -Windows) -and (Test-IsAdministrator)
+    return -not (Test-RunningUnderBuildServer) -and (Test-COperatingSystem -Windows) -and (Test-IsAdministrator)
 }
 
 function Test-RunningUnderBuildServer
