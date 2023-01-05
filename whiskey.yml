@@ -46,7 +46,7 @@ Build:
 
 - Zip:
     ArchivePath: .output\Carbon.Cryptography-$(WHISKEY_SEMVER2).zip
-    Path: 
+    Path:
     - Carbon.Cryptography
     Exclude:
     - "*.pdb"
@@ -81,7 +81,6 @@ Build:
             - "*\\Find-CTlsCertificate.Tests.ps1"
             - "*\\Get-CCertificate.Tests.ps1"
             - "*\\Import-Carbon.Cryptography.Tests.ps1"
-            - "*\\Install-CCertificate.Tests.ps1"
             - "*\\New-CRsaKeyPair.Tests.ps1"
             - "*\\Protect-CString.Tests.ps1"
             - "*\\Uninstall-CCertificate.Tests.ps1"
@@ -110,7 +109,6 @@ Build:
     - Tests\Convert-CSecureStringToString.Tests.ps1
     - Tests\Get-CCertificate.Tests.ps1
     - Tests\Import-Carbon.Cryptography.Tests.ps1
-    - Tests\Install-CCertificate.Tests.ps1
     - Tests\Protect-CString.Tests.ps1
     - Tests\Uninstall-CCertificate.Tests.ps1
     - Tests\Unprotect-CString.Tests.ps1
