@@ -14,16 +14,13 @@
 
 <#
 .SYNOPSIS
-Imports the Carbon.Cryptography module into the current session.
+OBSOLETE. Use `Import-Module` instead.
 
 .DESCRIPTION
-The `Import-Carbon.Cryptography.ps1` script imports the Carbon.Cryptography module into the current session. If the module is already
-loaded, it is removed, then reloaded.
+OBSOLETE. Use `Import-Module` instead.
 
 .EXAMPLE
-.\Import-Carbon.Cryptography.ps1
-
-Demonstrates how to use this script to import the Carbon.Cryptography module  into the current PowerShell session.
+OBSOLETE. Use `Import-Module` instead.
 #>
 [CmdletBinding()]
 param(
@@ -31,6 +28,8 @@ param(
 
 #Requires -Version 5.1
 Set-StrictMode -Version 'Latest'
+
+"The $($PSCommandPath | Resolve-Path -Relative) is OBSOLETE. Use ``Import-Module`` intead." | Write-Warning
 
 $originalVerbosePref = $Global:VerbosePreference
 $originalWhatIfPref = $Global:WhatIfPreference
