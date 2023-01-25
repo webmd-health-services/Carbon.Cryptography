@@ -49,6 +49,7 @@ document encryption, including in DSC resources and PowerShell's CMS message cmd
 * Added anew `KeyUsage` parameter to `New-CRsaKeyPair`. When not given, certificates with no key usages or enhanced key
 usages are created. Pass the key's usages to this parameter. Valid usages are `ClientAuthentication`, `CodeSigning`,
 `DocumentEncryption`, `DocumentSigning`, and `ServerAuthentication`.
+* Function `Convert-CCertificateProvider` to convert the provider of a certificate's private key.
 
 ## Changes
 

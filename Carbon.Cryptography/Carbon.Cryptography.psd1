@@ -77,6 +77,7 @@
 
     # Functions to export from this module. Only list public function here.
     FunctionsToExport = @(
+        'Convert-CCertificateProvider',
         'Convert-CSecureStringToByte',
         'Convert-CSecureStringToString',
         'Find-CCertificate',
