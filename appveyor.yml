@@ -53,7 +53,9 @@ for:
   build_script:
   - ps: |
         $ProgressPreference = 'SilentlyContinue'
-        iwr https://raw.githubusercontent.com/webmd-health-services/Prism/main/Scripts/init.ps1 | iex | Format-Table
+        $url = 'https://raw.githubusercontent.com/webmd-health-services/Prism/main/Scripts/init.ps1'
+        $headers = @{ Authentication = "Bearer $($env:GITHUB_ACCESS_TOKEN)" }
+        Invoke-WebRequest -Uri $url -Headers $headers | Invoke-Expression | Format-Table
         .\build.ps1
 
 # Build in PowerShell
@@ -63,5 +65,7 @@ for:
   build_script:
   - pwsh: |
         $ProgressPreference = 'SilentlyContinue'
-        iwr https://raw.githubusercontent.com/webmd-health-services/Prism/main/Scripts/init.ps1 | iex | Format-Table
+        $url = 'https://raw.githubusercontent.com/webmd-health-services/Prism/main/Scripts/init.ps1'
+        $headers = @{ Authentication = "Bearer $($env:GITHUB_ACCESS_TOKEN)" }
+        Invoke-WebRequest -Uri $url -Headers $headers | Invoke-Expression | Format-Table
         ./build.ps1
