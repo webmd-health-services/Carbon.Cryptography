@@ -161,7 +161,7 @@ Describe 'Convert-CCertificateProvider' {
         ThenReturned 'open.pfx' -WithOldProvider $script:oldProviderName -WithNewProvider $script:newProviderName
     }
 
-    It 'should change nothing' {
+    It 'should change nothing' -Skip:(-not (Get-Command -Name 'Get-FileHash' -ErrorAction Ignore)) {
         GivenCertificate 'open.pfx' -From $script:sourceCertPathUnprotected
         WhenConverting 'open.pfx' -WithArgs @{ ProviderName = $script:oldProviderName }
         ThenNoError
