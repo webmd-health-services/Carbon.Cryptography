@@ -18,7 +18,7 @@ Set-StrictMode -Version 'Latest'
 Add-Type -AssemblyName 'System.Security'
 
 # Functions should use $moduleRoot as the relative root from which to find
-# things. A published module has its function appended to this file, while a 
+# things. A published module has its function appended to this file, while a
 # module in development has its functions in the Functions directory.
 $moduleRoot = $PSScriptRoot
 $moduleBinRoot = Join-Path -Path $moduleRoot -ChildPath 'bin'
@@ -26,10 +26,10 @@ $moduleBinRoot | Out-Null # To make the PSScriptAnalyzer squiggle go away.
 $privateModulesRoot = Join-Path -Path $moduleRoot -ChildPath 'PSModules'
 
 Import-Module -Name (Join-Path -Path $privateModulesRoot -ChildPath 'Carbon.Core') `
-              -Function @('Invoke-CPowerShell', 'Test-COperatingSystem')
+              -Function @('ConvertTo-CBase64', 'Invoke-CPowerShell', 'Test-COperatingSystem')
 
-# Store each of your module's functions in its own file in the Functions 
-# directory. On the build server, your module's functions will be appended to 
+# Store each of your module's functions in its own file in the Functions
+# directory. On the build server, your module's functions will be appended to
 # this file, so only dot-source files that exist on the file system. This allows
 # developers to work on a module without having to build it first. Grab all the
 # functions that are in their own files.
