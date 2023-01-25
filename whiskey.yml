@@ -88,7 +88,8 @@ Build:
         TestResult:
             Enabled: true
             OutputPath: .output\pester5.xml
-        Output: Detailed
+        Output:
+            Verbosity: Detailed
 
 - Pester:
     # Because the DSC resource in the test is resolved during parsing not execution.
@@ -100,7 +101,8 @@ Build:
         TestResult:
             Enabled: true
             OutputPath: .output\pester5-new-crsakeypair.xml
-        Output: Detailed
+        Output:
+            Verbosity: Detailed
 
 - Pester4:
     Script:
