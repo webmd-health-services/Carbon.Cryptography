@@ -126,7 +126,7 @@ function Convert-CCertificateProvider
         '-ImportPfx'
         'Temp'
         $FilePath
-        'AT_KEYEXCHANGE'
+        'AT_KEYEXCHANGE,NoRoot'
     }) | Write-Verbose
 
     $certPath = Join-Path -Path 'Cert:\CurrentUser\Temp\' -ChildPath $cert.Thumbprint
