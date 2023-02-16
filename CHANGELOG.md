@@ -7,6 +7,7 @@
 Pass the provider's name to the new `ProviderName` parameter. Run `certutil -csplist` for a list of providers. The
 default provider is "Microsoft Enhanced RSA and AES Cryptographic Provider" (i.e. "Microsoft AES Cryptographic
 Provider").
+* Function `Convert-CCertificateProvider` to convert the provider of a certificate's private key.
 
 # 3.0.0
 
@@ -49,7 +50,6 @@ document encryption, including in DSC resources and PowerShell's CMS message cmd
 * Added anew `KeyUsage` parameter to `New-CRsaKeyPair`. When not given, certificates with no key usages or enhanced key
 usages are created. Pass the key's usages to this parameter. Valid usages are `ClientAuthentication`, `CodeSigning`,
 `DocumentEncryption`, `DocumentSigning`, and `ServerAuthentication`.
-* Function `Convert-CCertificateProvider` to convert the provider of a certificate's private key.
 
 ## Changes
 
