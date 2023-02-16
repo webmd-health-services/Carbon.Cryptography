@@ -166,7 +166,7 @@ Describe 'Convert-CCertificateProvider' {
         WhenConverting 'open.pfx' -WithArgs @{ ProviderName = $script:oldProviderName }
         ThenNoError
         ThenCertificate 'open.pfx' -HasProvider $script:oldProviderName -IsIdenticalTo $script:sourceCertPathUnprotected
-        ThenReturned -Nothing
+        ThenReturned 'open.pfx' -WithOldProvider $script:oldProviderName -WithNewProvider $script:oldProviderName
     }
 
     It 'should validate file path' {

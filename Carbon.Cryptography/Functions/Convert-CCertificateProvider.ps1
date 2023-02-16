@@ -32,10 +32,10 @@ function Convert-CCertificateProvider
     password protected.
 
     .EXAMPLE
-    Convert-CCertificateProvider -FilePath .\mycert.pfx -ProviderName 'Microsoft Enhanced RSA and AES Cryptographic Provider'
+    Convert-CCertificateProvider -FilePath .\mycert.pfx -ProviderName 'Microsoft Enhanced RSA and AES Cryptographic Provider' -Password $password
 
     Demonstrates how to convert the provider of a certificate's private key and the certificate file ***is*** password
-    protected.
+    protected. The password *must* be a `[securestring]`.
     #>
     [CmdletBinding()]
     param(
@@ -56,6 +56,13 @@ function Convert-CCertificateProvider
     Set-StrictMode -Version 'Latest'
     Use-CallerPreference -Cmdlet $PSCmdlet -SessionState $ExecutionContext.SessionState
 
+    if (-not (Get-Command -Name 'certutil' -ErrorAction Ignore))
+    {
+        "Unable to convert provider for certificate ""$($FilePath)"" because the certutil.exe command does not exist " +
+            'or is not in the current PATH.' | Write-Error -ErrorAction $ErrorActionPreference
+        return
+    }
+
     if (-not (Test-Path -Path $FilePath -PathType Leaf))
     {
         "Unable to convert provider for certificate ""$($FilePath)"" because it does not exist." |
@@ -74,7 +81,8 @@ function Convert-CCertificateProvider
 
     if (-not $cert.PrivateKey)
     {
-        "Unable to convert provider for certificate ""$($FilePath)"" because it does not have a private key." |
+        "Unable to convert provider for certificate ""$($FilePath)"" because the certificate does not have a private " +
+        'key.' |
             Write-Error -ErrorAction $ErrorActionPreference
         return
     }
@@ -98,14 +106,12 @@ function Convert-CCertificateProvider
 
     if ($pkProviderName -eq $ProviderName)
     {
-        Write-Verbose "Certificate ""$($FilePath)"" private key already using provider ""$($pkProviderName)""."
-        return
-    }
-
-    if (-not (Get-Command -Name 'certutil' -ErrorAction Ignore))
-    {
-        "Unable to convert provider for certificate ""$($FilePath)"" because the certutil.exe command does not exist " +
-            'or is not in the current PATH.' | Write-Error -ErrorAction $ErrorActionPreference
+        return [pscustomobject]@{
+            Path = $FilePath;
+            OldProviderName = $pkProviderName;
+            NewProviderName = $ProviderName;
+            NewCertificateBase64Encoded = ([IO.File]::ReadAllBytes($FilePath) | ConvertTo-CBase64);
+        }
         return
     }
 
