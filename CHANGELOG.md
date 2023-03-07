@@ -1,5 +1,9 @@
 <!-- markdownlint-disable MD024 (no-duplicate-heading/no-duplicate-header) -->
 
+# 3.1.1
+
+Fixed: Find-CCertificate fails if a certificate's subject alternate name is `null` or has a `null` value.
+
 # 3.1.0
 
 * The `New-CRsaKeyPair` function can now generate a key pair that uses a specific

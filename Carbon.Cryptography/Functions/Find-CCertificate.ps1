@@ -107,7 +107,7 @@ function Find-CCertificate
     }
     Write-Verbose ''
 
-    function Test-Object 
+    function Test-Object
     {
         [CmdletBinding()]
         param(
@@ -201,7 +201,9 @@ function Find-CCertificate
             {
                 $displayValues =
                     $InputObject |
+                    Where-Object { $null -ne $_ } |
                     ForEach-Object { $_ } |
+                    Where-Object { $null -ne $_ } |
                     ForEach-Object {
                         if( $_ -is [DateTime] )
                         {
@@ -360,7 +362,7 @@ function Find-CCertificate
                 continue
             }
         }
-        
+
         Write-Verbose -Message "^$('-' * ($longestLineLength - 1))^"
         $certificate | Write-Output
     }
