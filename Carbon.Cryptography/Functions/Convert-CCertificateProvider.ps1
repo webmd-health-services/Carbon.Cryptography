@@ -116,7 +116,7 @@ function Convert-CCertificateProvider
     }
 
     Write-Verbose "Importing ""$($FilePath)"" into temporary certificate store using provider ""$($ProviderName)""."
-    'y' | certutil (& {
+    $certUtilArgs = & {
         '-user'
         '-csp'
         $ProviderName
@@ -127,13 +127,30 @@ function Convert-CCertificateProvider
         }
         else
         {
-            '""'
+            if ($PSVersionTable['PSVersion'] -ge [Version]'7.0')
+            {
+                ""
+            }
+            else
+            {
+                '""'
+            }
         }
         '-ImportPfx'
         'Temp'
         $FilePath
         'AT_KEYEXCHANGE,NoRoot'
-    }) | Write-Verbose
+    }
+
+    $output = 'y' | certutil $certUtilArgs
+    if ($LASTEXITCODE)
+    {
+        $msg = "Failed to convert provider for ""$($FilePath)"" because the certutil conversion command failed:" +
+               $([Environment]::NewLine) +
+               $output
+        Write-Error -Message $msg -ErrorAction $ErrorActionPreference
+        return
+    }
 
     $certPath = Join-Path -Path 'Cert:\CurrentUser\Temp\' -ChildPath $cert.Thumbprint
     $cert = Get-Item -Path $certPath
