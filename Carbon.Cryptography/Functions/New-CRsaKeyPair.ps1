@@ -320,22 +320,32 @@ $($extensionsLine)
 
         Get-Content -Raw -Path $tempInfFile | Write-Verbose
 
-        $forceArg = ''
+        $forceArg = $null
         if( $Force )
         {
-            $forceArg = ' -f'
+            $forceArg = '-f'
         }
         Write-Debug "& ""$($certReqPath)"" -q$($forceArg) -new ""$($tempInfFile)"" ""$($PublicKeyFile)"""
-        $output = & $certReqPath -q ($forceArg.TrimStart()) -new $tempInfFile $PublicKeyFile
-        if( $LASTEXITCODE -or -not (Test-Path -Path $PublicKeyFile -PathType Leaf) )
+        $output = & $certReqPath -q $forceArg -new $tempInfFile $PublicKeyFile
+        if ($LASTEXITCODE)
         {
-            Write-Error ('Failed to create public/private key pair:{0}{1}' -f ([Environment]::NewLine),($output -join ([Environment]::NewLine)))
+            $msg = "The certreq command to create the public/private key pair failed with exit code " +
+                   "$($LASTEXITCODE):$([Environment]::NewLine)" +
+                   "$($output -join ([Environment]::NewLine))"
+            Write-Error $msg -ErrorAction $ErrorActionPreference
             return
         }
-        else
+
+        if (-not (Test-Path -Path $PublicKeyFile -PathType Leaf))
         {
-            $output | Write-Debug
+            $msg = 'Failed to create public/private key pair because the certreq command to create them succeeded ' +
+                   "but the expected public key file ""$($PublicKeyPath)"" does not exist:$([Environment]::NewLine)" +
+                   "$($output -join [Environment]::NewLine)"
+            Write-Error $msg -ErrorAction $ErrorActionPreference
+            return
         }
+
+        $output | Write-Debug
 
         $publicKey = Get-CCertificate -Path $PublicKeyFile
         if( -not $publicKey )
