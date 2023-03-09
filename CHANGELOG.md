@@ -1,8 +1,12 @@
 <!-- markdownlint-disable MD024 (no-duplicate-heading/no-duplicate-header) -->
 
+# 3.1.2
+
+Fixed: `Convert-CCertificateProvider` fails on Windows Server 2012 R2 when a certificate isn't password-protected.
+
 # 3.1.1
 
-Fixed: Find-CCertificate fails if a certificate's subject alternate name is `null` or has a `null` value.
+Fixed: `Find-CCertificate` fails if a certificate's subject alternate name is `null` or has a `null` value.
 
 # 3.1.0
 

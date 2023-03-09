@@ -120,21 +120,10 @@ function Convert-CCertificateProvider
         '-user'
         '-csp'
         $ProviderName
-        '-p'
         if ($Password)
         {
+            '-p'
             Convert-CSecureStringToString -SecureString $Password
-        }
-        else
-        {
-            if ($PSVersionTable['PSVersion'] -ge [Version]'7.0')
-            {
-                ""
-            }
-            else
-            {
-                '""'
-            }
         }
         '-ImportPfx'
         'Temp'
@@ -142,7 +131,7 @@ function Convert-CCertificateProvider
         'AT_KEYEXCHANGE,NoRoot'
     }
 
-    $output = 'y' | certutil $certUtilArgs
+    $output = '' | certutil $certUtilArgs
     if ($LASTEXITCODE)
     {
         $msg = "Failed to convert provider for ""$($FilePath)"" because the certutil conversion command failed:" +
