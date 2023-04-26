@@ -3,6 +3,13 @@
 
 # Carbon.Cryptography Changelog
 
+## 3.1.3
+
+> Released 26 Apr 2023
+
+Fixed: `Convert-CCertificateProvider` returns a value even when it performs no conversion.
+
+
 ## 3.1.2
 
 Fixed: `Convert-CCertificateProvider` fails on Windows Server 2012 R2 when a certificate isn't password-protected.
