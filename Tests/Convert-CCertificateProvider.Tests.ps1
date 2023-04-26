@@ -100,9 +100,16 @@ BeforeAll {
     function ThenReturned
     {
         param(
+            [Parameter(ParameterSetName='Certificate', Position=0)]
             $Name,
+
+            [Parameter(ParameterSetName='Certificate')]
             $WithOldProvider,
+
+            [Parameter(ParameterSetName='Certificate')]
             $WithNewProvider,
+
+            [Parameter(Mandatory, ParameterSetName='Nothing')]
             [switch] $Nothing
         )
 
@@ -166,7 +173,7 @@ Describe 'Convert-CCertificateProvider' {
         WhenConverting 'open.pfx' -WithArgs @{ ProviderName = $script:oldProviderName }
         ThenNoError
         ThenCertificate 'open.pfx' -HasProvider $script:oldProviderName -IsIdenticalTo $script:sourceCertPathUnprotected
-        ThenReturned 'open.pfx' -WithOldProvider $script:oldProviderName -WithNewProvider $script:oldProviderName
+        ThenReturned -Nothing
     }
 
     It 'should validate file path' {

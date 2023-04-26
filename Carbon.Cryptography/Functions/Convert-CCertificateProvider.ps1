@@ -10,7 +10,7 @@ function Convert-CCertificateProvider
     the certificate file to the `FilePath` parameter, and the new provider name to the `ProviderName` parameter. If the
     certificate file is password-protected, pass the password to the `Password` parameter.
 
-    If the private key's provider is already the value passed to the function, nothing happens.
+    If the private key's provider is already the value passed to the function, nothing happens and nothing is returned.
 
     The function uses the `certutil` command to import the certificate with its private key into a "Temp" store for the
     current user using the new provider. This command actually does the conversion process. Then,
@@ -106,12 +106,6 @@ function Convert-CCertificateProvider
 
     if ($pkProviderName -eq $ProviderName)
     {
-        return [pscustomobject]@{
-            Path = $FilePath;
-            OldProviderName = $pkProviderName;
-            NewProviderName = $ProviderName;
-            NewCertificateBase64Encoded = ([IO.File]::ReadAllBytes($FilePath) | ConvertTo-CBase64);
-        }
         return
     }
 
