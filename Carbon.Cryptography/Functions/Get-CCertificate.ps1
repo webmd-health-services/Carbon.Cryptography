@@ -37,6 +37,13 @@ function Get-CCertificate
     When loading certificates from a certificate store, `Get-CCertificate` adds `StoreLocation` and `StoreName`
     properties for the store where the certificate was found.
 
+    When loading a certificate from a file and that certificate contains a private key, Windows will temporarily write
+    that private key to disk for the lifetime of the certificate object. If you do not need access to the certificate's
+    private key, it's recommended to use `-KeyStorageFlags EphemeralKeySet` when loading the certificate from a file in
+    order to prevent the private key from ever being written to disk. Otherwise, if you will be accessing the
+    certificate's private key then it's recommended you call the `.Dispose()` method on the certificate object as soon
+    as you're done with it to ensure the private key is immediately removed from disk.
+
     .OUTPUTS
     System.Security.Cryptography.x509Certificates.X509Certificate2. The X509Certificate2 certificates that were found,
     or `$null`.
@@ -231,12 +238,12 @@ function Get-CCertificate
                         # macOS doesn't allow ephemeral key storage, which is kind of weird but whatever.
                         if( (Test-COperatingSystem -MacOS) )
                         {
-                            $KeyStorageFlags = 
+                            $KeyStorageFlags =
                                 $KeyStorageFlags -band -bnot [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
                         }
                         $ctorParams += $KeyStorageFlags
                     }
-                    New-Object 'Security.Cryptography.X509Certificates.X509Certificate2' -ArgumentList $ctorParams | 
+                    New-Object 'Security.Cryptography.X509Certificates.X509Certificate2' -ArgumentList $ctorParams |
                         Add-PathMember -Path $item.FullName |
                         Write-Output
                 }
@@ -278,7 +285,7 @@ function Get-CCertificate
                  [Management.Automation.WildcardPattern]::ContainsWildcardCharacters($Subject) -or `
                  $locationWildcard -eq '*' -or `
                  ($storeNameWildcard -eq '*' -and -not $CustomStoreName)
-                 
+
     [Security.Cryptography.X509Certificates.StoreLocation] $currentUserLocation =
         [Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser
     [Security.Cryptography.X509Certificates.StoreLocation] $localMachineLocation =

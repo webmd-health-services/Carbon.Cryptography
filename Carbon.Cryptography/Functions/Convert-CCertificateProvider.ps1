@@ -79,34 +79,46 @@ function Convert-CCertificateProvider
     }
     $cert = Get-CCertificate -Path $FilePath @pwdArg
 
-    if (-not $cert.PrivateKey)
+    try
     {
-        "Unable to convert provider for certificate ""$($FilePath)"" because the certificate does not have a private " +
-        'key.' |
-            Write-Error -ErrorAction $ErrorActionPreference
-        return
-    }
+        if (-not $cert.PrivateKey)
+        {
+            "Unable to convert provider for certificate ""$($FilePath)"" because the certificate does not have a private " +
+            'key.' |
+                Write-Error -ErrorAction $ErrorActionPreference
+            return
+        }
 
-    $pk = $cert.PrivateKey
-    $pkProviderName = ''
-    if ($pk | Get-Member 'Key')
-    {
-        $pkProviderName = $pk.Key.Provider.Provider
-    }
-    elseif ($pk | Get-Member 'CspKeyContainerInfo')
-    {
-        $pkProviderName = $pk.CspKeyContainerInfo.ProviderName
-    }
-    else
-    {
-        "Unable to convert provider for certificate ""$($FilePath)"" because it does not have a supported private key " +
-            'implementation.' | Write-Error -ErrorAction $ErrorActionPreference
-        return
-    }
+        $thumbprint = $cert.Thumbprint
+        $pk = $cert.PrivateKey
+        $pkProviderName = ''
+        if ($pk | Get-Member 'Key')
+        {
+            $pkProviderName = $pk.Key.Provider.Provider
+        }
+        elseif ($pk | Get-Member 'CspKeyContainerInfo')
+        {
+            $pkProviderName = $pk.CspKeyContainerInfo.ProviderName
+        }
+        else
+        {
+            "Unable to convert provider for certificate ""$($FilePath)"" because it does not have a supported private key " +
+                'implementation.' | Write-Error -ErrorAction $ErrorActionPreference
+            return
+        }
 
-    if ($pkProviderName -eq $ProviderName)
+        if ($pkProviderName -eq $ProviderName)
+        {
+            return
+        }
+
+    }
+    finally
     {
-        return
+        # When loading a certificate from a file, Windows will temporarily write the private key to disk for the
+        # lifetime of the certificate object. To limit the amount of time the private key spends on disk, dispose the
+        # certificate object as soon as we are done with it.
+        $cert.Dispose()
     }
 
     Write-Verbose "Importing ""$($FilePath)"" into temporary certificate store using provider ""$($ProviderName)""."
@@ -129,13 +141,13 @@ function Convert-CCertificateProvider
     if ($LASTEXITCODE)
     {
         $msg = "Failed to convert provider for ""$($FilePath)"" because the certutil conversion command failed:" +
-               $([Environment]::NewLine) +
-               $output
+            $([Environment]::NewLine) +
+            $output
         Write-Error -Message $msg -ErrorAction $ErrorActionPreference
         return
     }
 
-    $certPath = Join-Path -Path 'Cert:\CurrentUser\Temp\' -ChildPath $cert.Thumbprint
+    $certPath = Join-Path -Path 'Cert:\CurrentUser\Temp\' -ChildPath $thumbprint
     $cert = Get-Item -Path $certPath
     if (-not $cert)
     {
