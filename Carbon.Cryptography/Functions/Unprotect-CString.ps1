@@ -180,6 +180,11 @@ function Unprotect-CString
 
         [byte[]]$keyBytes = [byte[]]::New(0)
 
+        # When loading a certificate from a file, Windows will temporarily write the private key to disk for the
+        # lifetime of the certificate object. To limit the amount of time the private key spends on disk, dispose the
+        # certificate object as soon as we are done with it.
+        $disposeCertWhenDone = ($PrivateKeyPath -ne '') -and ($PrivateKeyPath -notlike 'Cert:\*')
+
         # Find and validate the RSA certificate, if needed. We do it here so our try/catch around the actual
         # decryption doesn't handle these errors.
         if( $PSCmdlet.ParameterSetName -like 'RSA*' )
@@ -231,6 +236,15 @@ function Unprotect-CString
                 if( -not $Certificate )
                 {
                     return
+                }
+
+                if ($disposeCertWhenDone)
+                {
+                    # Dispose the other unused certificates.
+                    foreach ($unusedCert in ($certificates | Select-Object -Skip 1))
+                    {
+                        $unusedCert.Dispose()
+                    }
                 }
             }
 
@@ -366,19 +380,24 @@ function Unprotect-CString
         }
         finally
         {
-            if( $decryptedBytes )
+            if ($decryptedBytes)
             {
                 $decryptedBytes.Clear()
             }
 
-            if( $encryptedBytes )
+            if ($encryptedBytes)
             {
                 $encryptedBytes.Clear()
             }
 
-            if( $keyBytes )
+            if ($keyBytes)
             {
                 $keyBytes.Clear()
+            }
+
+            if ($disposeCertWhenDone)
+            {
+                $Certificate.Dispose()
             }
         }
     }

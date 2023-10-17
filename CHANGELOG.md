@@ -3,6 +3,14 @@
 
 # Carbon.Cryptography Changelog
 
+## 3.2.0
+
+> Released 17 Oct 2023
+
+When reading certificates from a file, the module now disposes references to those certificates as soon it is done with
+them. This limits the amount of time a certificate's private key spends on disk when the certificate has been loaded
+from a file.
+
 ## 3.1.3
 
 > Released 26 Apr 2023
