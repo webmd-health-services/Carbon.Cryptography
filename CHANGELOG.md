@@ -3,6 +3,14 @@
 
 # Carbon.Cryptography Changelog
 
+## 3.3.0
+
+> Released 29 Jan 2024
+
+`Find-CCertificate` and `Find-CTlsCertificate` now support finding certificates with a Subject Alternative Name that
+contains a wildcard that matches the given `HostName`. For example: Passing `test.example.com` to the `HostName` parameter
+will return a certificate whose Subject Alternative Name contains `*.example.com`.
+
 ## 3.2.0
 
 > Released 17 Oct 2023

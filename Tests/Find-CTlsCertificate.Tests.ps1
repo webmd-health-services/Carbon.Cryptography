@@ -66,7 +66,7 @@ BeforeAll {
         [void] $script:mockedCertificates.Add($mockCert)
     }
 
-    function ThenFoundCertificate 
+    function ThenFoundCertificate
     {
         param(
             [String] $WithThumbprint
@@ -124,7 +124,7 @@ BeforeAll {
         {
             $optionalParams['Trusted'] = $ThatIsTrusted
         }
-        
+
         $script:foundCert = Find-CTlsCertificate @optionalParams
     }
 }
@@ -150,29 +150,35 @@ Describe 'Find-CTlsCertificate' {
         GivenCertificate -For 'does not match hostname'
         GivenCertificate -For 'also does not match hostname'
         WhenFindingTlsCertificate 'example.com' -ErrorAction SilentlyContinue
-        ThenNoCertificateFound 
+        ThenNoCertificateFound
     }
 
     It 'should not find a certificate when no private key exists' {
         GivenCertificate -For 'noprivatekey.com' -WithNoPrivateKey
         WhenFindingTlsCertificate 'noprivatekey.com' -ErrorAction SilentlyContinue
-        ThenNoCertificateFound 
+        ThenNoCertificateFound
     }
 
     It 'should find the certificate when subject alternate name matches' {
-        GivenCertificate -For $machineName -WithDnsNames ('fake.net', 'fake2.net')
+        GivenCertificate -For $env:COMPUTERNAME -WithDnsNames ('fake.net', 'fake2.net')
         WhenFindingTlsCertificate 'fake2.net'
         ThenFoundCertificate
     }
 
+    It 'should find the certificate when subject alternate name matches wildcard' {
+        GivenCertificate -For 'localhost' -WithDnsNames ('*.example.com')
+        WhenFindingTlsCertificate 'test.example.com' -Verbose
+        ThenFoundCertificate
+    }
+
     It 'should not find a certificate when key usage is not Server Authentication' {
-        GivenCertificate -For 'invalidkeyusage.com' -WithUsages ('Remote Desktop Authentication', 'Client Authentication') 
+        GivenCertificate -For 'invalidkeyusage.com' -WithUsages ('Remote Desktop Authentication', 'Client Authentication')
         WhenFindingTlsCertificate 'invalidkeyusage.com' -ErrorAction SilentlyContinue
-        ThenNoCertificateFound 
+        ThenNoCertificateFound
     }
 
     It 'should not find a certificate when key usage is Server Authentication' {
-        GivenCertificate -For 'validkeyusage.com' -WithUsages ('Remote Desktop Authentication', 'Server Authentication') 
+        GivenCertificate -For 'validkeyusage.com' -WithUsages ('Remote Desktop Authentication', 'Server Authentication')
         WhenFindingTlsCertificate 'validkeyusage.com'
         ThenFoundCertificate
     }
@@ -192,7 +198,7 @@ Describe 'Find-CTlsCertificate' {
     It 'should not find a certificate when certificate is expired' {
         GivenCertificate -For 'expired.com' -ThatExpires (Get-Date).AddDays(-1)
         WhenFindingTlsCertificate 'expired.com' -ErrorAction SilentlyContinue
-        ThenNoCertificateFound 
+        ThenNoCertificateFound
     }
 
     It 'should not find a certificate when certificate has not started' {
