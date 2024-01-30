@@ -5,7 +5,7 @@
 
 ## 3.3.0
 
-> Released 29 Jan 2024
+> Released 30 Jan 2024
 
 `Find-CCertificate` and `Find-CTlsCertificate` now support finding certificates with a Subject Alternative Name that
 contains a wildcard that matches the given `HostName`. For example: Passing `test.example.com` to the `HostName` parameter

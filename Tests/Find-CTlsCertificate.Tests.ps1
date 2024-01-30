@@ -160,7 +160,7 @@ Describe 'Find-CTlsCertificate' {
     }
 
     It 'should find the certificate when subject alternate name matches' {
-        GivenCertificate -For $env:COMPUTERNAME -WithDnsNames ('fake.net', 'fake2.net')
+        GivenCertificate -For [Environment]::MachineName -WithDnsNames ('fake.net', 'fake2.net')
         WhenFindingTlsCertificate 'fake2.net'
         ThenFoundCertificate
     }
