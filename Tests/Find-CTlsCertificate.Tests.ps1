@@ -167,7 +167,7 @@ Describe 'Find-CTlsCertificate' {
 
     It 'should find the certificate when subject alternate name matches wildcard' {
         GivenCertificate -For 'localhost' -WithDnsNames ('*.example.com')
-        WhenFindingTlsCertificate 'test.example.com' -Verbose
+        WhenFindingTlsCertificate 'test.example.com'
         ThenFoundCertificate
     }
 

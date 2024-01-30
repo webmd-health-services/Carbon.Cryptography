@@ -5,5 +5,8 @@
 /Carbon.Cryptography/*.md
 /Carbon.Cryptography/LICENSE
 /Carbon.Cryptography/NOTICE
-/Tests/
+/Tests/.password
+/Tests/PASSWORD
+/Tests/private.pfx
+/Tests/public.cer
 output
