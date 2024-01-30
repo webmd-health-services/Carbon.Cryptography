@@ -20,7 +20,7 @@ BeforeAll {
             [String[]] $WithDnsNames = @(),
 
             [String[]] $WithKeyUsageNames = @(),
-            
+
             [String[]] $WithKeyUsageOids = @(),
 
             [switch] $ThatIsTrusted,
@@ -171,6 +171,19 @@ Describe 'Find-CCertificate' {
         GivenCertificate -For 'CN=example.com' -WithDnsNames @('example.com', 'nine.example.com')
         WhenFinding @{ HostName = '*.example.com' }
         ThenFound 'CN=example.com'
+    }
+
+    It 'should find hostname using subject alternate name with wildcard' {
+        GivenCertificate -For 'CN=*.test.example.com' -WithDnsNames @('*.test.example.com')
+        GivenCertificate -For 'CN=andnot.example.com' -WithDnsNames @('*.example.com')
+        WhenFinding @{ HostName = 'fourteen.test.example.com' }
+        ThenFound 'CN=*.test.example.com'
+    }
+
+    It 'should find wildcard hostname using subject alternate name with wildcard' {
+        GivenCertificate -For 'CN=*.example.com' -WithDnsNames @('*.example.com')
+        WhenFinding @{ HostName = '*.example.com' }
+        ThenFound 'CN=*.example.com'
     }
 
     It 'should find literal hostname that matches subject common name' {

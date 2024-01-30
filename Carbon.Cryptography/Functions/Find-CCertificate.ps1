@@ -180,7 +180,26 @@ function Find-CCertificate
             }
             elseif( $ContainsLike )
             {
-                $success = $null -ne ($InputObject | Where-Object { $_ -like $Value })
+                $success = $false
+
+                foreach ($nameItem in $InputObject)
+                {
+                    if ($nameItem[0] -eq '*')
+                    {
+                        # Wildcards in certificates only ever match one "level" of a domain name and must be on the very left.
+                        # Therefore the wildcard can match any character except for "."
+                        $wildcardRegex = '[^\.]+'
+                        $baseName = $nameItem.Substring(1)               # *.example.com  ➔ .example.com
+                        $escapedBaseName = [Regex]::Escape($baseName)    #  .example.com  ➔ \.example\.com
+                        $regex = "^${wildcardRegex}$($escapedBaseName)$" # \.example\.com ➔ ^[^\.]+\.example\.com$
+                        $success = $Value -match $regex
+                    }
+                    else
+                    {
+                        $success = $nameItem -like $Value
+                    }
+                }
+
             }
             elseif( $Match )
             {

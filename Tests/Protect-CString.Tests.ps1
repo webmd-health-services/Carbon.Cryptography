@@ -15,26 +15,26 @@ Describe 'Protect-CString' {
     BeforeEach {
         $Global:Error.Clear()
     }
-        
+
     function Assert-IsBase64EncodedString($String)
     {
         $String | Should -Not -BeNullOrEmpty 'Didn''t encrypt cipher text.'
         { [Convert]::FromBase64String( $String ) } | Should -Not -Throw
     }
-    
+
     if( (Test-TCOperatingSystem -IsWindows) )
     {
         It 'should protect string' {
             $cipherText = Protect-CString -String 'Hello World!' -ForUser
             Assert-IsBase64EncodedString( $cipherText )
         }
-        
+
         It 'should protect string with scope' {
-            $user = Protect-CString -String 'Hello World' -ForUser 
+            $user = Protect-CString -String 'Hello World' -ForUser
             $machine = Protect-CString -String 'Hello World' -ForComputer
             $machine | Should -Not -Be $user -Because 'encrypting at different scopes resulted in the same string'
         }
-        
+
         It 'should protect strings in pipeline' {
             $secrets = @('Foo','Fizz','Buzz','Bar') | Protect-CString -ForUser
             $secrets.Length | Should -Be 4 -Because 'Didn''t encrypt all items in the pipeline.'
@@ -43,7 +43,7 @@ Describe 'Protect-CString' {
                 Assert-IsBase64EncodedString $secret
             }
         }
-        
+
         It 'should encrypt from cert store by thumbprint' {
             $cert = Get-ChildItem -Path cert:\* -Recurse |
                         Where-Object { $_ | Get-Member 'PublicKey' } |
@@ -66,7 +66,7 @@ Describe 'Protect-CString' {
             $expectedCipherText = Protect-CString -String $secret -PublicKeyPath $certPath
             $expectedCipherText | Should -Not -BeNullOrEmpty
         }
-        
+
         It 'should handle path not found' {
             $ciphertext = Protect-CString -String 'fubar' -PublicKeyPath 'cert:\currentuser\fubar' -ErrorAction SilentlyContinue
             $Global:Error.Count | Should -BeGreaterThan 0
@@ -87,7 +87,7 @@ Describe 'Protect-CString' {
             Convert-CSecureStringToString |
             Should -Be $secret
     }
-    
+
     It 'should handle not getting an rsa certificate' {
         $cert = Get-CCertificate -Path $dsaKeyPath
         $cert | Should -Not -BeNullOrEmpty
@@ -97,14 +97,14 @@ Describe 'Protect-CString' {
         $Global:Error[0] | Should -Match 'not an RSA public key'
         $ciphertext | Should -BeNullOrEmpty
     }
-    
+
     It 'should handle thumbprint not in store' {
        $ciphertext = Protect-CString -String 'fubar' -Thumbprint '1111111111111111111111111111111111111111' -ErrorAction SilentlyContinue
        $Global:Error.Count | Should -BeGreaterThan 0
        $Global:Error[0] | Should -Match 'not found'
        $ciphertext | Should -BeNullOrEmpty
     }
-    
+
     It 'should encrypt from certificate file' {
         $cert = Get-CCertificate -Path $publicKeyFilePath
         $cert | Should -Not -BeNullOrEmpty
@@ -112,12 +112,12 @@ Describe 'Protect-CString' {
         $ciphertext = Protect-CString -String $secret -PublicKeyPath $publicKeyFilePath
         $ciphertext | Should -Not -BeNullOrEmpty
         $ciphertext | Should -Not -Be $secret
-        $privateKey = Get-CCertificate -Path $privateKeyFilePath 
+        $privateKey = Get-CCertificate -Path $privateKeyFilePath
         (Unprotect-CString -ProtectedString $ciphertext -Certificate $privateKey) |
             Convert-CSecureStringToString |
             Should -Be $secret
     }
-    
+
     It 'should encrypt a secure string' {
         $cert = Get-CCertificate -Path $publicKeyFilePath
         $cert | Should -Not -BeNullOrEmpty
@@ -128,8 +128,8 @@ Describe 'Protect-CString' {
         $ciphertext = Protect-CString -String $secret -PublicKeyPath $publicKeyFilePath
         $ciphertext | Should -Not -BeNullOrEmpty
         $ciphertext | Should -Not -Be $secret
-        $privateKey = Get-CCertificate -Path $privateKeyFilePath 
-        $decryptedPassword = 
+        $privateKey = Get-CCertificate -Path $privateKeyFilePath
+        $decryptedPassword =
             Unprotect-CString -ProtectedString $ciphertext -Certificate $privateKey | Convert-CSecureStringToString
         $decryptedPassword | Should -Be $password
         $passwordBytes = [Text.Encoding]::Unicode.GetBytes($password)
@@ -164,7 +164,7 @@ Describe 'Protect-CString' {
             Convert-CSecureStringToString |
             Should -Be $secret
     }
-    
+
     It 'should use direct encryption padding switch' {
         $secret = [Guid]::NewGuid().ToString()
         $ciphertext = Protect-CString -String $secret `
@@ -241,15 +241,15 @@ Describe 'Protect-CString.when encryption fails' {
     # Anyone know how to get DPAPI or AES encryption to fail?
     Context 'RSA' {
         It 'should fail' {
-            { 
+            {
                 $Global:Error.Clear()
                 # Definitely too big to be encrypted by RSA.
                 $plainText = 'a' * 1000
                 Protect-CString -String $plainText -PublicKeyPath $publicKeyFilePath -ErrorAction SilentlyContinue |
                     Should -BeNullOrEmpty
                 # Different error message on different versions of .NET and different platforms
-                #         WinPS 5.1 | PS Core 7            | Linux        | macOS                     | macOS
-                $regex = 'Bad Length|parameter is incorrect|data too large|message exceeds the maximum|wrong input size'
+                #         WinPS 5.1 | Win PS Core 7                      | Linux        | macOS                     | macOS
+                $regex = 'Bad Length|parameter is incorrect|Unknown error|data too large|message exceeds the maximum|wrong input size'
                 $Global:Error | Should -Match $regex
             } |
                 Should -Not -Throw

@@ -2,4 +2,11 @@
 /PSModules/
 /.vscode/
 /Carbon.Cryptography/PSModules/
+/Carbon.Cryptography/*.md
+/Carbon.Cryptography/LICENSE
+/Carbon.Cryptography/NOTICE
 /Tests/.password
+/Tests/PASSWORD
+/Tests/private.pfx
+/Tests/public.cer
+output
