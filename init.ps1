@@ -21,26 +21,22 @@ Set-StrictMode -Version 'Latest'
 $ErrorActionPreference = 'Stop'
 $InformationPreference = 'Continue'
 
-if( -not (Get-Command -Name 'prism' -ErrorAction Ignore) )
-{
-    Get-PSRepository |
-        ForEach-Object { Set-PSRepository -Name $_.Name -InstallationPolicy Trusted }
-
-    Find-Module -Name 'Prism' -MinimumVersion '0.5.0' |
-        Select-Object -First 1 |
-        Install-Module -Scope CurrentUser
-}
-
-prism install -Recurse
+prism install
+prism install -Path (Join-Path -Path $PSScriptRoot -ChildPath 'Carbon.Cryptography' -Resolve)
 
 & {
     Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'PSModules\Carbon' -Resolve) `
-                  -Verbose:$false `
-                  -Function @('Install-CUser', 'Grant-CPermission')
-    Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'Carbon.Cryptography\PSModules\Carbon.Core' -Resolve) `
-                  -Verbose:$false `
-                  -Function @('Test-COperatingSystem', 'Invoke-CPowerShell')
+                  -Function @('Install-CGroup', 'Install-CUser', 'Grant-CPrivateKeyPermission') `
+                  -Verbose:$false
+    Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'Carbon.Cryptography\Modules\Carbon.Core' -Resolve) `
+                  -Function @('Test-COperatingSystem', 'Invoke-CPowerShell') `
+                  -Verbose:$false
+    Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'Carbon.Cryptography' -Resolve) `
+                  -Function @('Install-CCertificate') `
+                  -Verbose:$false
 }
+
+Install-CGroup -Name 'CCryptoTestGroup1' -Description 'Group used by Carbon.Cryptography PowerShell module tests.'
 
 $passwordPath = Join-Path -Path $PSScriptRoot -ChildPath 'Tests\.password'
 if( -not (Test-Path -Path $passwordPath) )
@@ -48,7 +44,7 @@ if( -not (Test-Path -Path $passwordPath) )
     Write-Verbose -Message ('Generating random password for test accounts.')
     $rng = [Security.Cryptography.RNGCryptoServiceProvider]::New()
     $randomBytes = [byte[]]::New(12)
-    do 
+    do
     {
         $rng.GetBytes($randomBytes);
         $password = [Convert]::ToBase64String($randomBytes)
@@ -72,10 +68,10 @@ else
 }
 
 $password,$salt = Get-Content -Path $passwordPath -TotalCount 2
-$users = 
+$users =
     Import-LocalizedData -BaseDirectory (Join-Path -Path $PSScriptRoot -ChildPath 'Tests') -FileName 'users.psd1' |
     ForEach-Object { $_['Users'] } |
-    ForEach-Object { 
+    ForEach-Object {
         $_['Description'] = "Carbon.Cryptography $($_['For']) test user."
         [pscustomobject]$_ | Write-Output
     }
@@ -99,8 +95,8 @@ foreach( $user in $users )
     {
         if( -not (sudo dscl . -list /Users | Where-Object { $_ -eq $username }) )
         {
-            $newUid = 
-                sudo dscl . -list /Users UniqueID | 
+            $newUid =
+                sudo dscl . -list /Users UniqueID |
                 ForEach-Object { $username,$uid = $_ -split ' +' ; return [int]$uid } |
                 Sort-Object |
                 Select-Object -Last 1
@@ -129,4 +125,14 @@ foreach( $user in $users )
             sudo useradd -p $encryptedPassword -m $username --comment $user.Description
         }
     }
+}
+
+$testsPath =  Join-Path -Path $PSScriptRoot -ChildPath 'Tests' -Resolve
+foreach ($fileName in @('CarbonRsaCng.pfx', 'CarbonTestPrivateKey.pfx'))
+{
+    $certPath = Join-Path -Path $testsPath -ChildPath $fileName
+    Write-Information "Install ${fileName} in LocalMachine My store."
+    Install-CCertificate -Path $certPath -StoreLocation LocalMachine -StoreName My
+    Write-Information "Install ${fileName} in CurrentUser My store."
+    Install-CCertificate -Path $certPath -StoreLocation CurrentUser -StoreName My
 }

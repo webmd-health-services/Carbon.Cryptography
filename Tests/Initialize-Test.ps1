@@ -13,7 +13,7 @@ Execute this script as the first thing in each of your test fixtures:
 
     #Requires -Version 5.1
     Set-StrictMode -Version 'Latest'
-    
+
     & (Join-Path -Path $PSScriptRoot -ChildPath 'Initialize-Test.ps1' -Resolve)
 #>
 [CmdletBinding()]
@@ -33,10 +33,17 @@ if( (Get-Module -Name 'Carbon') )
     Remove-Module -Name 'Carbon' -Force
 }
 
+$privateModulesPath = Join-Path -Path $PSScriptRoot -ChildPath '..\Carbon.Cryptography\Modules' -Resolve
 Import-Module -Name 'Microsoft.PowerShell.Security'
-Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath '..\Carbon.Cryptography\PSModules\Carbon.Core' -Resolve) `
+Import-Module -Name (Join-Path -Path $privateModulesPath -ChildPath 'Carbon.Core' -Resolve) `
               -Prefix 'T' `
-              -Force
+              -Force `
+              -Verbose:$false
+Import-Module -Name (Join-Path -Path $privateModulesPath -ChildPath 'Carbon.Accounts' -Resolve) `
+              -Function @('Resolve-CIdentityName', 'Test-CIdentity') `
+              -Prefix 'T' `
+              -Force `
+              -Verbose:$false
 
 try
 {

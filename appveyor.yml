@@ -57,7 +57,14 @@ for:
         $url = 'https://raw.githubusercontent.com/webmd-health-services/Prism/main/Scripts/init.ps1'
         $headers = @{ Authentication = "Bearer $($env:GITHUB_ACCESS_TOKEN)" }
         Invoke-WebRequest -Uri $url -Headers $headers | Invoke-Expression | Format-Table
-        .\build.ps1
+        try
+        {
+          .\build.ps1
+        }
+        finally
+        {
+          $Global:Error | Format-List * -Force
+        }
 
 # Build in PowerShell
 - matrix:
@@ -70,4 +77,11 @@ for:
         $url = 'https://raw.githubusercontent.com/webmd-health-services/Prism/main/Scripts/init.ps1'
         $headers = @{ Authentication = "Bearer $($env:GITHUB_ACCESS_TOKEN)" }
         Invoke-WebRequest -Uri $url -Headers $headers | Invoke-Expression | Format-Table
-        ./build.ps1
+        try
+        {
+          ./build.ps1
+        }
+        finally
+        {
+          $Global:Error | Format-List * -Force
+        }

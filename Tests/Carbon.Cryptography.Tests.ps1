@@ -56,7 +56,7 @@ BeforeAll {
 
         if( $HasDescription )
         {
-            $help.Description | Should -Not -BeNullOrEmpty
+            $help.Description | Should -Not -BeNullOrEmpty -Because "command ${Named} should have a help topic"
         }
 
         if( $HasExamples )

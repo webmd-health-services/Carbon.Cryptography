@@ -2,167 +2,111 @@
 #Requires -Version 5.1
 Set-StrictMode -Version 'Latest'
 
+$script:rsaCertPath = 'Cert:\CurrentUser\My\44A7C2F73353BC53F82318C14490D7E2500B6DE9'
+$script:cngCertPath = 'Cert:\CurrentUser\My\6CF94E242624811F7E12A5340502C1ECE88F1B18'
+
 BeforeAll {
     Set-StrictMode -Version 'Latest'
 
-    $script:testDirPath = ''
-    $script:testNum = 0
-    $user = 'CarbonGrantPerms'
-    $containerPath = $null
-    $privateKeyPath = Join-Path -Path $PSScriptRoot -ChildPath 'Cryptography\CarbonTestPrivateKey.pfx' -Resolve
-    & (Join-Path -Path $PSScriptRoot -ChildPath 'Initialize-CarbonTest.ps1' -Resolve)
+    & (Join-Path -Path $PSScriptRoot -ChildPath 'Initialize-Test.ps1' -Resolve)
 
-    $credential = New-CCredential -UserName $user -Password 'a1b2c3d4!'
-    Install-CUser -Credential $credential -Description 'User for Carbon Grant-Permission tests.'
+    $script:user = 'CCryptoTestUser1'
+    $script:rsaCertPath = 'Cert:\CurrentUser\My\44A7C2F73353BC53F82318C14490D7E2500B6DE9'
+    $script:cngCertPath = 'Cert:\CurrentUser\My\6CF94E242624811F7E12A5340502C1ECE88F1B18'
+
+    function ThenPermission
+    {
+        [CmdletBinding()]
+        param(
+            [Parameter(Mandatory)]
+            [String] $OnPrivateKey,
+
+            [Parameter(Mandatory)]
+            [String] $For,
+
+            [switch] $Inherited,
+
+            [switch] $Not,
+
+            [switch] $Exists
+        )
+
+        $accessRule = Get-CPrivateKeyPermission -Path $OnPrivateKey -Identity $For -Inherited:$Inherited
+        if ($Not)
+        {
+            $accessRule | Should -BeNullOrEmpty
+        }
+        else
+        {
+            $accessRule | Should -Not -BeNullOrEmpty
+            $expectedPerms = 'Read, Synchronize'
+            $pk = Get-CCertificate -Path $OnPrivateKey | Get-CPrivateKey
+            $usesCryptoKeyRights =
+                Invoke-CPrivateCommand -Name 'Test-CCryptoKeyAvailable' -Parameter @{ InputObject = $pk }
+            if ($usesCryptoKeyRights)
+            {
+                $expectedPerms = 'Synchronize, GenericRead'
+            }
+            $accessRule | Select-Object -ExpandProperty '*Rights' | Should -Be $expectedPerms
+        }
+    }
+
+    function ThenError
+    {
+        [CmdletBinding()]
+        [Diagnostics.CodeAnalysis.SuppressMessage('PSAvoidAssignmentToAutomaticVariable', '')]
+        param(
+            [Parameter(Mandatory, ParameterSetName='IsEmpty')]
+            [switch] $IsEmpty
+        )
+
+        $Global:Error | Should -BeNullOrEmpty
+    }
 }
 
-Describe 'Revoke-Permission' {
+Describe 'Revoke-CPrivateKeyPermission' {
     BeforeEach {
         $Global:Error.Clear()
-        $script:testDirPath = Join-Path -Path $TestDrive -ChildPath $script:testNum
-        New-Item -Path $script:testDirPath -ItemType 'Directory'
-        Grant-Permission -Path $script:testDirPath -Identity $user -Permission 'FullControl'
+        Grant-CPrivateKeyPermission -Path $script:rsaCertPath -Identity $script:user -Permission Read
+        Grant-CPrivateKeyPermission -Path $script:cngCertPath -Identity $script:user -Permission Read
     }
 
-    AfterEach {
-        $script:testNum += 1
-    }
+    $testCases = @(
+        @{ Description = 'RSA' ; CertPath = $script:rsaCertPath },
+        @{ Description = 'CNG' ; CertPath = $script:cngCertPath }
+    )
 
-    It 'when user has multiple access control entries on an item' {
-        Grant-Permission -Path $script:testDirPath -Identity $credential.UserName -Permission 'Read'
-        $perm = Get-Permission -Path $script:testDirPath -Identity $credential.UserName
-        Mock -CommandName 'Get-Permission' -ModuleName 'Carbon' -MockWith { $perm ; $perm }.GetNewClosure()
-        $Global:Error.Clear()
-        Revoke-Permission -Path $script:testDirPath -Identity $credential.UserName
-        $Global:Error | Should -BeNullOrEmpty
-        Carbon\Get-Permission -Path $script:testDirPath -Identity $credential.UserName | Should -BeNullOrEmpty
-    }
+    Context '<Description>' -ForEach $testCases {
 
-    It 'should revoke permission' {
-        Revoke-Permission -Path $script:testDirPath -Identity $user
-        $Global:Error.Count | Should -Be 0
-        (Test-Permission -Path $script:testDirPath -Identity $user -Permission 'FullControl') | Should -BeFalse
-    }
-
-    It 'should not revoke inherited permissions' {
-        Get-Permission -Path $script:testDirPath -Inherited |
-            Where-Object { $_.IdentityReference -notlike ('*{0}*' -f $user) } |
-            ForEach-Object {
-                $result = Revoke-Permission -Path $script:testDirPath -Identity $_.IdentityReference
-                $Global:Error.Count | Should -Be 0
-                $result | Should -BeNullOrEmpty
-                (Test-Permission -Identity $_.IdentityReference -Path $script:testDirPath -Inherited -Permission $_.FileSystemRights) | Should -BeTrue
-            }
-    }
-
-    It 'should handle revoking non existent permission' {
-        Revoke-Permission -Path $script:testDirPath -Identity $user
-        (Test-Permission -Path $script:testDirPath -Identity $user -Permission 'FullControl') | Should -BeFalse
-        Revoke-Permission -Path $script:testDirPath -Identity $user
-        $Global:Error.Count | Should -Be 0
-        (Test-Permission -Path $script:testDirPath -Identity $user -Permission 'FullControl') | Should -BeFalse
-    }
-
-    It 'should resolve relative path' {
-        Push-Location -Path (Split-Path -Parent -Path $script:testDirPath)
-        try
-        {
-            Revoke-Permission -Path ('.\{0}' -f (Split-Path -Leaf -Path $script:testDirPath)) -Identity $user
-            (Test-Permission -Path $script:testDirPath -Identity $user -Permission 'FullControl') | Should -BeFalse
+        It 'revokes permission' {
+            Revoke-CPrivateKeyPermission -Path $CertPath -Identity $script:user
+            ThenError -IsEmpty
+            ThenPermission -OnPrivateKey $CertPath -For $script:user -Not -Exists
         }
-        finally
-        {
-            Pop-Location
+
+        It 'ignores inherited permissions' {
+            Get-CPrivateKeyPermission -Path $CertPath -Inherited
+                Where-Object { $_.IdentityReference -notlike ('*{0}*' -f $script:user) } |
+                ForEach-Object {
+                    $result = Revoke-CPrivateKeyPermission -Path $CertPath -Identity $_.IdentityReference
+                    ThenError -IsEmpty
+                    $result | Should -BeNullOrEmpty
+                    ThenPermission -OnPrivateKey $CertPath -For $script:user -Inherited -Exists
+                }
+        }
+
+        It 'ignores non existent permission' {
+            Revoke-CPrivateKeyPermission -Path $CertPath -Identity $script:user
+            ThenError -IsEmpty
+            ThenPermission -OnPrivateKey $CertPath -For $script:user -Not -Exists
+            Revoke-CPrivateKeyPermission -Path $CertPath -Identity $script:user
+            ThenError -IsEmpty
+            ThenPermission -OnPrivateKey $CertPath -For $script:user -Not -Exists
+        }
+
+        It 'should support what if' {
+            Revoke-CPrivateKeyPermission -Path $CertPath -Identity $script:user -WhatIf
+            ThenPermission -OnPrivateKey $CertPath -For $script:user -Exists
         }
     }
-
-    It 'should support what if' {
-        Revoke-Permission -Path $script:testDirPath -Identity $user -WhatIf
-        (Test-Permission -Path $script:testDirPath -Identity $user -Permission 'FullControl') | Should -BeTrue
-    }
-
-    It 'should revoke permission on registry' {
-        $regKey = 'hkcu:\TestRevokePermissions'
-        New-Item $regKey
-
-        try
-        {
-            Grant-Permission -Identity $user -Permission 'ReadKey' -Path $regKey
-            $result = Revoke-Permission -Path $regKey -Identity $user
-            $result | Should -BeNullOrEmpty
-            (Test-Permission -Path $regKey -Identity $user -Permission 'ReadKey') | Should -BeFalse
-        }
-        finally
-        {
-            Remove-Item $regKey
-        }
-    }
-
-    It 'should revoke local machine private key permissions' {
-        $cert = Install-Certificate -Path $privateKeyPath -StoreLocation LocalMachine -StoreName My -NoWarn
-        try
-        {
-            $certPath = Join-Path -Path 'cert:\LocalMachine\My' -ChildPath $cert.Thumbprint
-            Grant-Permission -Path $certPath -Identity $user -Permission 'FullControl'
-            (Get-Permission -Path $certPath -Identity $user) | Should -Not -BeNullOrEmpty
-            Revoke-Permission -Path $certPath -Identity $user
-            $Global:Error.Count | Should -Be 0
-            (Get-Permission -Path $certPath -Identity $user) | Should -BeNullOrEmpty
-        }
-        finally
-        {
-            Uninstall-Certificate -Thumbprint $cert.Thumbprint -StoreLocation LocalMachine -StoreName My -NoWarn
-        }
-    }
-
-    It 'should revoke current user private key permissions' {
-        $cert = Install-Certificate -Path $privateKeyPath -StoreLocation CurrentUser -StoreName My -NoWarn
-        try
-        {
-            $certPath = Join-Path -Path 'cert:\CurrentUser\My' -ChildPath $cert.Thumbprint
-            Grant-Permission -Path $certPath -Identity $user -Permission 'FullControl' -WhatIf
-            $Global:Error.Count | Should -Be 0
-            (Get-Permission -Path $certPath -Identity $user) | Should -BeNullOrEmpty
-        }
-        finally
-        {
-            Uninstall-Certificate -Thumbprint $cert.Thumbprint -StoreLocation CurrentUser -StoreName My -NoWarn
-        }
-    }
-
-    It 'should support what if when revoking private key permissions' {
-        $cert = Install-Certificate -Path $privateKeyPath -StoreLocation LocalMachine -StoreName My -NoWarn
-        try
-        {
-            $certPath = Join-Path -Path 'cert:\LocalMachine\My' -ChildPath $cert.Thumbprint
-            Grant-Permission -Path $certPath -Identity $user -Permission 'FullControl'
-            (Get-Permission -Path $certPath -Identity $user) | Should -Not -BeNullOrEmpty
-            Revoke-Permission -Path $certPath -Identity $user -WhatIf
-            $Global:Error.Count | Should -Be 0
-            (Get-Permission -Path $certPath -Identity $user) | Should -Not -BeNullOrEmpty
-        }
-        finally
-        {
-            Uninstall-Certificate -Thumbprint $cert.Thumbprint -StoreLocation LocalMachine -StoreName My -NoWarn
-        }
-    }
-
-    It 'revokes permission on cng certificate' {
-        $cngCertPath = Join-Path -Path $PSScriptRoot -ChildPath 'Certificates\CarbonRsaCng.pfx' -Resolve
-        $cert = Install-Certificate -Path $cngCertPath -StoreLocation LocalMachine -StoreName My -NoWarn
-        try
-        {
-            $certPath = Join-Path -Path 'cert:\LocalMachine\My' -ChildPath $cert.Thumbprint
-            Grant-Permission -Path $certPath -Identity $user -Permission 'FullControl'
-            Get-Permission -Path $certPath -Identity $user | Should -Not -BeNullOrEmpty
-            Revoke-Permission -Path $certPath -Identity $user
-            $Global:Error.Count | Should -Be 0
-            Get-Permission -Path $certPath -Identity $user | Should -BeNullOrEmpty
-        }
-        finally
-        {
-            Uninstall-Certificate -Thumbprint $cert.Thumbprint -StoreLocation LocalMachine -StoreName My -NoWarn
-        }
-    }
-
 }
