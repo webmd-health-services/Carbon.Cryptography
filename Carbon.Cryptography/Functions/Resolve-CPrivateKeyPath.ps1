@@ -52,6 +52,12 @@ function Resolve-CPrivateKeyPath
         Set-StrictMode -Version 'Latest'
         Use-CallerPreference -Cmdlet $PSCmdlet -Session $ExecutionContext.SessionState
 
+        if (-not $IsWindows)
+        {
+            Write-Error -Message 'Resolve-CPrivateKeyPath only supports Windows.' -ErrorAction $ErrorActionPreference
+            return
+        }
+
         function Test-SearchPath
         {
             [CmdletBinding()]

@@ -79,6 +79,12 @@ function Test-CPrivateKeyPermission
     Set-StrictMode -Version 'Latest'
     Use-CallerPreference -Cmdlet $PSCmdlet -Session $ExecutionContext.SessionState
 
+    if (-not $IsWindows)
+    {
+        Write-Error -Message 'Test-CPrivateKeyPermission only supports Windows.' -ErrorAction $ErrorActionPreference
+        return
+    }
+
     if (-not (Test-Path -Path $Path))
     {
         $msg = "Failed to test permissions on ""${Path}"" because that path does not exist."

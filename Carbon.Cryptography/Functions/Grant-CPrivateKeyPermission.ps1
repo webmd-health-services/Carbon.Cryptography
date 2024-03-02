@@ -134,6 +134,12 @@ function Grant-CPrivateKeyPermission
     Set-StrictMode -Version 'Latest'
     Use-CallerPreference -Cmdlet $PSCmdlet -Session $ExecutionContext.SessionState
 
+    if (-not $IsWindows)
+    {
+        Write-Error -Message 'Grant-CPrivateKeyPermission only supports Windows.' -ErrorAction $ErrorActionPreference
+        return
+    }
+
     if (-not (Test-Path -Path $Path))
     {
         $msg = "Failed to grant permissions on ""${Path}"" certificate's private key because the certificate does " +

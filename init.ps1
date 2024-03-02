@@ -36,7 +36,11 @@ prism install -Path (Join-Path -Path $PSScriptRoot -ChildPath 'Carbon.Cryptograp
                   -Verbose:$false
 }
 
-Install-CGroup -Name 'CCryptoTestGroup1' -Description 'Group used by Carbon.Cryptography PowerShell module tests.'
+$groupName = 'CCryptoTestGroup1'
+if (Test-COperatingSystem -IsWindows)
+{
+    Install-CGroup -Name $groupName -Description 'Group used by Carbon.Cryptography PowerShell module tests.'
+}
 
 $passwordPath = Join-Path -Path $PSScriptRoot -ChildPath 'Tests\.password'
 if( -not (Test-Path -Path $passwordPath) )
@@ -97,7 +101,7 @@ foreach( $user in $users )
         {
             $newUid =
                 sudo dscl . -list /Users UniqueID |
-                ForEach-Object { $username,$uid = $_ -split ' +' ; return [int]$uid } |
+                ForEach-Object { $null,$uid = $_ -split ' +' ; return [int]$uid } |
                 Sort-Object |
                 Select-Object -Last 1
             Write-Verbose "  Found highest user ID ""$($newUid)""."
@@ -127,12 +131,16 @@ foreach( $user in $users )
     }
 }
 
-$testsPath =  Join-Path -Path $PSScriptRoot -ChildPath 'Tests' -Resolve
-foreach ($fileName in @('CarbonRsaCng.pfx', 'CarbonTestPrivateKey.pfx'))
+
+if (Test-COperatingSystem -IsWindows)
 {
-    $certPath = Join-Path -Path $testsPath -ChildPath $fileName
-    Write-Information "Install ${fileName} in LocalMachine My store."
-    Install-CCertificate -Path $certPath -StoreLocation LocalMachine -StoreName My
-    Write-Information "Install ${fileName} in CurrentUser My store."
-    Install-CCertificate -Path $certPath -StoreLocation CurrentUser -StoreName My
+    $testsPath =  Join-Path -Path $PSScriptRoot -ChildPath 'Tests' -Resolve
+    foreach ($fileName in @('CarbonRsaCng.pfx', 'CarbonTestPrivateKey.pfx'))
+    {
+        $certPath = Join-Path -Path $testsPath -ChildPath $fileName
+        Write-Information "Install ${fileName} in LocalMachine My store."
+        Install-CCertificate -Path $certPath -StoreLocation LocalMachine -StoreName My
+        Write-Information "Install ${fileName} in CurrentUser My store."
+        Install-CCertificate -Path $certPath -StoreLocation CurrentUser -StoreName My
+    }
 }
