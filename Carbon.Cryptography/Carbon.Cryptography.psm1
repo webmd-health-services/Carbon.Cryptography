@@ -1,3 +1,7 @@
+
+using namespace System.Security.AccessControl
+using namespace System.Security.Cryptography.X509Certificates
+
 # Copyright Aaron Jensen and WebMD Health Services
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,6 +19,16 @@
 #Requires -Version 5.1
 Set-StrictMode -Version 'Latest'
 
+if( -not (Test-Path 'variable:IsWindows') )
+{
+    [Diagnostics.CodeAnalysis.SuppressMessage('PSAvoidAssignmentToAutomaticVariable', '')]
+    $IsWindows = $true
+    [Diagnostics.CodeAnalysis.SuppressMessage('PSAvoidAssignmentToAutomaticVariable', '')]
+    $IsLinux = $false
+    [Diagnostics.CodeAnalysis.SuppressMessage('PSAvoidAssignmentToAutomaticVariable', '')]
+    $IsMacOS = $false
+}
+
 Add-Type -AssemblyName 'System.Security'
 
 # Functions should use $moduleRoot as the relative root from which to find
@@ -23,10 +37,30 @@ Add-Type -AssemblyName 'System.Security'
 $moduleRoot = $PSScriptRoot
 $moduleBinRoot = Join-Path -Path $moduleRoot -ChildPath 'bin'
 $moduleBinRoot | Out-Null # To make the PSScriptAnalyzer squiggle go away.
-$privateModulesRoot = Join-Path -Path $moduleRoot -ChildPath 'PSModules'
+$privateModulesRoot = Join-Path -Path $moduleRoot -ChildPath 'Modules'
 
 Import-Module -Name (Join-Path -Path $privateModulesRoot -ChildPath 'Carbon.Core') `
-              -Function @('ConvertTo-CBase64', 'Invoke-CPowerShell', 'Test-COperatingSystem')
+              -Function @(
+                    'ConvertTo-CBase64',
+                    'Get-CPathProvider',
+                    'Invoke-CPowerShell',
+                    'Test-COperatingSystem'
+                ) `
+              -Verbose:$false
+
+Import-Module -Name (Join-Path -Path $privateModulesRoot -ChildPath 'Carbon.Accounts') `
+              -Function @('Resolve-CIdentity', 'Resolve-CIdentityName', 'Test-CIdentity') `
+              -Verbose:$false
+
+Import-Module -Name (Join-Path -Path $privateModulesRoot -ChildPath 'Carbon.Permissions') `
+              -Function @(
+                    'Get-CAcl',
+                    'Get-CPermission',
+                    'Grant-CPermission',
+                    'Revoke-CPermission',
+                    'Test-CPermission'
+                ) `
+              -Verbose:$false
 
 # Store each of your module's functions in its own file in the Functions
 # directory. On the build server, your module's functions will be appended to

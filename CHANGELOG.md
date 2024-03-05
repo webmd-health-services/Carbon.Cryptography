@@ -3,13 +3,55 @@
 
 # Carbon.Cryptography Changelog
 
+## 3.4.0
+
+### Upgrade Instructions
+
+If upgrading/switching from Carbon's `Get-CPermission`, `Grant-CPermission`, `Revoke-CPermission`, and/or
+`Test-CPermission` to `Get-CPrivateKeyPermission`, `Grant-CPrivateKeyPermission`, `Revoke-CPrivateKeyPermission`, and/or
+`Test-CPrivateKeyPermission`, respectively:
+
+* Rename usages of `Get-CPermission`, `Grant-CPermission`, `Revoke-CPermission`, and
+`Test-CPermission` to `Get-CPrivateKeyPermission`, `Grant-CPrivateKeyPermission`, `Revoke-CPrivateKeyPermission`, and
+`Test-CPrivateKeyPermission`, respectively.
+* `Get-CPrivateKeyPermission`, `Grant-CPrivateKeyPermission`, `Revoke-CPrivateKeyPermission`, and
+`Test-CPrivateKeyPermission` now write an error and return if passed an identity that does not exist. Add `-ErrorAction
+SilentlyContinue` or `-ErrorAction Ignore` to preserve previous behavior.
+* `Grant-CPrivateKeyPermission` (when using the `-PassThru` switch) and `Get-CPrivateKeyPermission` return
+`System.Security.AccessControl.CryptoKeyAccessRule` objects if on Windows PowerShell and the .NET framework uses its RSA
+or DSA crypto service provider to manage the private key. Otherwise, it returns
+`System.Security.AccessControl.FileSystemAccessRule` objects. Update usages accordingly. The two objects have the same
+properties, so most current usages that don't care about the object's type should work unchanged.
+* `Get-CPrivateKeyPermission`, `Grant-CPrivateKeyPermission`, `Revoke-CPrivateKeyPermission`, and
+`Test-CPrivateKeyPermission` now write warnings if the X509 certificate doesn't have a private key. Add
+`-WarningAction SilentlyContinue` to usages to preserve previous behavior.
+* Ensure usages of `Grant-CPrivateKeyPermission` and `Test-CPrivateKeyPermission` only pass `Read` and `FullControl`
+values for the `Permission` parameter. Those are the only values allowed by the Windows UI, and Carbon is following that
+pattern.
+* Remove usages of the `Grant-CPrivateKeyPermission` function's `-Append` switch. Only two permissions are allowed on a
+private key, and one of them is FullControl, so it doesn't make sense to allow both `Read` and `FullControl`
+permissions.
+* Remove usages of the `Grant-CPrivateKeyPermission` and `Test-CPrivateKeyPermission` functions' `-ApplyTo` parameter.
+* Remove usages of the `Grant-CPrivateKeyPermission` and `Revoke-CPrivateKeyPermission` functions' `Description`
+parameter.
+
+### Added
+
+* Function `Get-CPrivateKey` for getting an X509 certificate's private key (Windows only).
+* Function `Get-CPrivateKeyPermission` for getting the permissions on an X509 certificate's private key (Windows only).
+* Function `Grant-CPrivateKeyPermission` for granting permissions to an X509 certificate's private key (Windows only).
+* Function `Resolve-CPrivateKeyPath` for getting the path to an X509 certificate's private key (Windows only).
+* Function `Revoke-CPrivateKeyPermission` for removing permissions to an X509 certificate's private key (Windows only).
+* Function `Test-CPrivateKeyPermission` for testing permission on an X509 certificate's private key (Windows only).
+
+
 ## 3.3.0
 
 > Released 30 Jan 2024
 
 `Find-CCertificate` and `Find-CTlsCertificate` now support finding certificates with a Subject Alternative Name that
-contains a wildcard that matches the given `HostName`. For example: Passing `test.example.com` to the `HostName` parameter
-will return a certificate whose Subject Alternative Name contains `*.example.com`.
+contains a wildcard that matches the given `HostName`. For example: Passing `test.example.com` to the `HostName`
+parameter will return a certificate whose Subject Alternative Name contains `*.example.com`.
 
 ## 3.2.0
 

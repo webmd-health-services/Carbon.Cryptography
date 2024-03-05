@@ -1,5 +1,5 @@
 
-$psModulesRoot = Join-Path -Path $PSScriptRoot -ChildPath '..\..\Carbon.Cryptography\PSModules' -Resolve
+$psModulesRoot = Join-Path -Path $PSScriptRoot -ChildPath '..\..\Carbon.Cryptography\Modules' -Resolve
 
 Import-Module -Name (Join-Path -Path $psModulesRoot -ChildPath 'Carbon.Core' -Resolve) `
               -Function ('Test-COperatingSystem')
@@ -23,6 +23,39 @@ function Get-TestUserCredential
 
     $password = Get-Content -Path $passwordFilePath -TotalCount 1
     return [pscredential]::New($Name, (ConvertTo-SecureString -String $password -AsPlainText -Force))
+}
+
+function Invoke-CPrivateCommand
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [String] $Name,
+
+        [hashtable] $Parameter = @{}
+    )
+
+    $Global:CTName = $Name
+    $Global:CTParameter = $Parameter
+
+    if( $VerbosePreference -eq 'Continue' )
+    {
+        $Parameter['Verbose'] = $true
+    }
+
+    $Parameter['ErrorAction'] = $ErrorActionPreference
+
+    try
+    {
+        InModuleScope 'Carbon.Cryptography' {
+            & $CTName @CTParameter
+        }
+    }
+    finally
+    {
+        Remove-Variable -Name 'CTParameter' -Scope 'Global'
+        Remove-Variable -Name 'CTName' -Scope 'Global'
+    }
 }
 
 function New-MockCertificate

@@ -76,7 +76,6 @@ Build:
         Run:
             Path: Tests\*.Tests.ps1
             ExcludePath:
-            - "*\\Carbon.Cryptography.Tests.ps1"
             - "*\\Convert-CSecureStringToString.Tests.ps1"
             - "*\\Find-CTlsCertificate.Tests.ps1"
             - "*\\Get-CCertificate.Tests.ps1"
@@ -106,7 +105,6 @@ Build:
 
 - Pester4:
     Script:
-    - Tests\Carbon.Cryptography.Tests.ps1
     - Tests\Convert-CSecureStringToString.Tests.ps1
     - Tests\Get-CCertificate.Tests.ps1
     - Tests\Protect-CString.Tests.ps1

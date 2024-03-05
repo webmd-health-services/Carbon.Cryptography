@@ -263,7 +263,7 @@ function Unprotect-CString
                     'was imported incorrectly or was created without a private key. Make sure you''ve generated an ' +
                     'RSA public/private key pair and are using the private key. If the private key is in the Windows ' +
                     'certificate store, make sure the current user has permission to read the private key (use ' +
-                    'Carbon''s `Grant-CPermission` function).'
+                    'Carbon.Cryptography''s `Grant-CPrivateKeyPermission` function).'
                 Write-Error -Message $msg -ErrorAction $ErrorActionPreference
                 return
             }
