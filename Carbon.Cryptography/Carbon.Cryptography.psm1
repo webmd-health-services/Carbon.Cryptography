@@ -52,7 +52,7 @@ Import-Module -Name (Join-Path -Path $privateModulesRoot -ChildPath 'Carbon.Acco
               -Function @('Resolve-CIdentity', 'Resolve-CIdentityName', 'Test-CIdentity') `
               -Verbose:$false
 
-Import-Module -Name (Join-Path -Path $privateModulesRoot -ChildPath 'Carbon.Permissions') `
+Import-Module -Name (Join-Path -Path $privateModulesRoot -ChildPath 'Carbon.Security') `
               -Function @(
                     'Get-CAcl',
                     'Get-CPermission',

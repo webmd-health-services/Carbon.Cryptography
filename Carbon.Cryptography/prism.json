@@ -9,7 +9,7 @@
             "Version": "1.*"
         },
         {
-            "Name": "Carbon.Permissions",
+            "Name": "Carbon.Security",
             "Version": "1.*-*"
         }
     ],
