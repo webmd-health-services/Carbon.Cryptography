@@ -5,6 +5,7 @@ Build:
     Prerelease:
     - main: ""
     - "*": rc1
+    IncrementPrereleaseVersion: true
 
 # Update the AppVeyor build/version number.
 - Exec:
