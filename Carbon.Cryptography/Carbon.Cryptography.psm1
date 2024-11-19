@@ -31,15 +31,15 @@ if( -not (Test-Path 'variable:IsWindows') )
 
 Add-Type -AssemblyName 'System.Security'
 
-# Functions should use $moduleRoot as the relative root from which to find
+# Functions should use $script:moduleRoot as the relative root from which to find
 # things. A published module has its function appended to this file, while a
 # module in development has its functions in the Functions directory.
-$moduleRoot = $PSScriptRoot
-$moduleBinRoot = Join-Path -Path $moduleRoot -ChildPath 'bin'
+$script:moduleRoot = $PSScriptRoot
+$moduleBinRoot = Join-Path -Path $script:moduleRoot -ChildPath 'bin'
 $moduleBinRoot | Out-Null # To make the PSScriptAnalyzer squiggle go away.
-$privateModulesRoot = Join-Path -Path $moduleRoot -ChildPath 'Modules'
+$psModulesDirPath = $script:moduleRoot
 
-Import-Module -Name (Join-Path -Path $privateModulesRoot -ChildPath 'Carbon.Core') `
+Import-Module -Name (Join-Path -Path $psModulesDirPath -ChildPath 'Carbon.Core') `
               -Function @(
                     'ConvertTo-CBase64',
                     'Get-CPathProvider',
@@ -48,11 +48,11 @@ Import-Module -Name (Join-Path -Path $privateModulesRoot -ChildPath 'Carbon.Core
                 ) `
               -Verbose:$false
 
-Import-Module -Name (Join-Path -Path $privateModulesRoot -ChildPath 'Carbon.Accounts') `
-              -Function @('Resolve-CIdentity', 'Resolve-CIdentityName', 'Test-CIdentity') `
+Import-Module -Name (Join-Path -Path $psModulesDirPath -ChildPath 'Carbon.Accounts') `
+              -Function @('Resolve-CPrincipal', 'Resolve-CPrincipalName', 'Test-CPrincipal') `
               -Verbose:$false
 
-Import-Module -Name (Join-Path -Path $privateModulesRoot -ChildPath 'Carbon.Security') `
+Import-Module -Name (Join-Path -Path $psModulesDirPath -ChildPath 'Carbon.Security') `
               -Function @(
                     'Get-CAcl',
                     'Get-CPermission',

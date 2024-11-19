@@ -28,7 +28,7 @@ prism install -Path (Join-Path -Path $PSScriptRoot -ChildPath 'Carbon.Cryptograp
     Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'PSModules\Carbon' -Resolve) `
                   -Function @('Install-CGroup', 'Install-CUser', 'Grant-CPrivateKeyPermission') `
                   -Verbose:$false
-    Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'Carbon.Cryptography\Modules\Carbon.Core' -Resolve) `
+    Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'Carbon.Cryptography\Carbon.Core' -Resolve) `
                   -Function @('Test-COperatingSystem', 'Invoke-CPowerShell') `
                   -Verbose:$false
     Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'Carbon.Cryptography' -Resolve) `

@@ -153,6 +153,9 @@ function Resolve-CPrivateKeyPath
         $foundOne = $false
         foreach ($cert in $Certificate)
         {
+            $certErrMsg = "Failed to find the path to the ""$($cert.Subject)"" ($($cert.Thumbprint)) " +
+                          'certificate''s private key because '
+
             $privateKey = $cert | Get-CPrivateKey
             if (-not $privateKey)
             {
@@ -171,9 +174,9 @@ function Resolve-CPrivateKeyPath
 
             if (-not $fileName)
             {
-                $msg = "${certErrMsg}is of type [$($privateKey.GetType().FullName)], which is not currently " +
-                       'supported by Carbon. [Please request support by submitting an issue on the project''s ' +
-                       'GitHub issues page.](https://github.com/webmd-health-services/Carbon.Cryptography/issues/new)'
+                $msg = "${certErrMsg}the private key has type [$($privateKey.GetType().FullName)], which is not " +
+                       'currently supported by Carbon. [Please request support by submitting an issue on the ' +
+                       'project''s GitHub issues page.](https://github.com/webmd-health-services/Carbon.Cryptography/issues/new)'
                 Write-Error -Message $msg -ErrorAction $ErrorActionPreference
                 continue
             }

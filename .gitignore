@@ -1,7 +1,7 @@
 /.output/
 /PSModules/
 /.vscode/
-/Carbon.Cryptography/Modules/
+/Carbon.Cryptography/Carbon.*/
 /Carbon.Cryptography/*.md
 /Carbon.Cryptography/LICENSE
 /Carbon.Cryptography/NOTICE

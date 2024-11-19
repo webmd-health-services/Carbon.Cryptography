@@ -1,5 +1,5 @@
 
-$psModulesRoot = Join-Path -Path $PSScriptRoot -ChildPath '..\..\Carbon.Cryptography\Modules' -Resolve
+$psModulesRoot = Join-Path -Path $PSScriptRoot -ChildPath '..\..\Carbon.Cryptography' -Resolve
 
 Import-Module -Name (Join-Path -Path $psModulesRoot -ChildPath 'Carbon.Core' -Resolve) `
               -Function ('Test-COperatingSystem')

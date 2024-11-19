@@ -33,14 +33,14 @@ if( (Get-Module -Name 'Carbon') )
     Remove-Module -Name 'Carbon' -Force
 }
 
-$privateModulesPath = Join-Path -Path $PSScriptRoot -ChildPath '..\Carbon.Cryptography\Modules' -Resolve
+$privateModulesPath = Join-Path -Path $PSScriptRoot -ChildPath '..\Carbon.Cryptography' -Resolve
 Import-Module -Name 'Microsoft.PowerShell.Security'
 Import-Module -Name (Join-Path -Path $privateModulesPath -ChildPath 'Carbon.Core' -Resolve) `
               -Prefix 'T' `
               -Force `
               -Verbose:$false
 Import-Module -Name (Join-Path -Path $privateModulesPath -ChildPath 'Carbon.Accounts' -Resolve) `
-              -Function @('Resolve-CIdentityName', 'Test-CIdentity') `
+              -Function @('Resolve-CPrincipalName', 'Test-CPrincipal') `
               -Prefix 'T' `
               -Force `
               -Verbose:$false

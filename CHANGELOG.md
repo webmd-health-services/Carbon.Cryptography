@@ -3,7 +3,14 @@
 
 # Carbon.Cryptography Changelog
 
+## 3.4.1
+
+* Fixed: `Resolve-CPrivateKeyPath` fails to write an error message when it can't find a private key.
+* Reducing depth of nested modules and updating private dependencies.
+
 ## 3.4.0
+
+> Released 10 Jun 2024
 
 ### Upgrade Instructions
 

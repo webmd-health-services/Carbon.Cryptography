@@ -1,16 +1,22 @@
-# Overview
+# Carbon.Cryptography
+
+## Overview
 
 The "Carbon.Cryptography" module has functions that help manage X509 certificates and working with secure strings.
 
 It started out as part of the [Carbon](http://get-carbon.org) module. But when that module become too big and unwieldy,
 its security-related functionality was moved into this module.
 
-# System Requirements
+## System Requirements
 
 * Windows PowerShell 5.1 and .NET 4.6.1+
 * PowerShell Core 6+
 
-# Installing
+## Dependencies
+
+Carbon.Cryptography has a private, nested dependency on PureInvoke 1.0.1.
+
+## Installing
 
 To install globally:
 
@@ -26,7 +32,7 @@ Save-Module -Name 'Carbon.Cryptography' -Path '.'
 Import-Module -Name '.\Carbon.Cryptography'
 ```
 
-# Commands
+## Commands
 
 * `Convert-CSecureStringToByte`: converts a secure string into an array of bytes (that can be easily cleared from from
 memory, unlike strings, who hang out forever).
