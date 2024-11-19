@@ -16,6 +16,11 @@ BeforeAll {
 
     & (Join-Path -Path $PSScriptRoot -ChildPath 'Initialize-Test.ps1' -Resolve)
 
+    $psModulesPath = Join-Path -Path $PSScriptRoot -ChildPath '..\Carbon.Cryptography' -Resolve
+    Import-Module -Name (Join-Path -Path $psModulesPath -ChildPath 'Carbon.Accounts' -Resolve) `
+                  -Function @('Test-CPrincipal') `
+                  -Verbose:$false
+
     $script:rsaCertPath = 'Cert:\CurrentUser\My\44A7C2F73353BC53F82318C14490D7E2500B6DE9'
     $script:cngCertPath = 'Cert:\CurrentUser\My\6CF94E242624811F7E12A5340502C1ECE88F1B18'
 
@@ -63,7 +68,7 @@ Describe 'Get-CPrivateKeyPermission' {
             ForEach-Object { Join-Path -Path 'cert:' -ChildPath (Split-Path -NoQualifier -Path $_.PSPath) } |
             ForEach-Object {
                 [Object[]]$rules =
-                    Get-CPrivateKeyPermission -Path $_ | Where-Object { Test-TCIdentity $_.IdentityReference.Value }
+                    Get-CPrivateKeyPermission -Path $_ -ErrorAction Ignore | Where-Object { Test-CPrincipal $_.IdentityReference.Value }
                 foreach( $rule in $rules )
                 {
                     [Object[]]$identityRule = Get-CPrivateKeyPermission -Path $_ -Identity $rule.IdentityReference.Value

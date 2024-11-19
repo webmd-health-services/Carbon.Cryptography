@@ -70,7 +70,7 @@ function Revoke-CPrivateKeyPermission
         return
     }
 
-    if (-not (Test-CIdentity -Name $Identity))
+    if (-not (Test-CPrincipal -Name $Identity))
     {
         $msg = "Failed to revoke ""${Permission}"" rights on ""${Path}"" to ""${Identity}"" because that user/group " +
                'does not exist.'
@@ -78,7 +78,7 @@ function Revoke-CPrivateKeyPermission
         return
     }
 
-    $Identity = Resolve-CIdentityName -Name $Identity
+    $Identity = Resolve-CPrincipalName -Name $Identity
 
     $rulesToRemove = Get-CPrivateKeyPermission -Path $Path -Identity $Identity
     if (-not $rulesToRemove)

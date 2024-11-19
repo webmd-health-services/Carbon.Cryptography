@@ -92,14 +92,14 @@ function Test-CPrivateKeyPermission
         return
     }
 
-    if( -not (Test-CIdentity -Name $Identity ) )
+    if( -not (Test-CPrincipal -Name $Identity ) )
     {
         $msg = "Failed to test permissions on ""${Path}"" for ""${Identity}"" because that user/group does not exist."
         Write-Error -Message $msg -ErrorAction $ErrorActionPreference
         return
     }
 
-    $Identity = Resolve-CIdentityName -Name $Identity
+    $Identity = Resolve-CPrincipalName -Name $Identity
 
     foreach ($certificate in (Get-Item -Path $Path -Force))
     {

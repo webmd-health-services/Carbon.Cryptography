@@ -148,7 +148,7 @@ function Grant-CPrivateKeyPermission
         return
     }
 
-    if (-not (Test-CIdentity -Name $Identity))
+    if (-not (Test-CPrincipal -Name $Identity))
     {
         $msg = "Failed to grant ""${Permission}"" permissions on ""${Path}"" to ""${Identity}"" because that " +
                'user/group does not exist.'
@@ -156,7 +156,7 @@ function Grant-CPrivateKeyPermission
         return
     }
 
-    $Identity = Resolve-CIdentityName -Name $Identity
+    $Identity = Resolve-CPrincipalName -Name $Identity
 
     foreach ($certificate in (Get-Item -Path $Path -Force))
     {
