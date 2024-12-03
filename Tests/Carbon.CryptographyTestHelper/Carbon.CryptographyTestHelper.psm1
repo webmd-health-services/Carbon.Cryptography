@@ -1,7 +1,7 @@
 
-$psModulesRoot = Join-Path -Path $PSScriptRoot -ChildPath '..\..\Carbon.Cryptography' -Resolve
+$psModulesDirPath = Join-Path -Path $PSScriptRoot -ChildPath '..\..\Carbon.Cryptography\Modules' -Resolve
 
-Import-Module -Name (Join-Path -Path $psModulesRoot -ChildPath 'Carbon.Core' -Resolve) `
+Import-Module -Name (Join-Path -Path $psModulesDirPath -ChildPath 'Carbon.Core' -Resolve) `
               -Function ('Test-COperatingSystem')
 
 function Get-TestUserCredential

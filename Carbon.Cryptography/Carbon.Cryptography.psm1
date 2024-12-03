@@ -37,7 +37,8 @@ Add-Type -AssemblyName 'System.Security'
 $script:moduleRoot = $PSScriptRoot
 $moduleBinRoot = Join-Path -Path $script:moduleRoot -ChildPath 'bin'
 $moduleBinRoot | Out-Null # To make the PSScriptAnalyzer squiggle go away.
-$psModulesDirPath = $script:moduleRoot
+
+$psModulesDirPath = Join-Path -Path $script:moduleRoot -ChildPath 'Modules' -Resolve
 
 Import-Module -Name (Join-Path -Path $psModulesDirPath -ChildPath 'Carbon.Core') `
               -Function @(

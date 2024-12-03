@@ -1,10 +1,10 @@
 /.output/
-/PSModules/
 /.vscode/
-/Carbon.Cryptography/Carbon.*/
 /Carbon.Cryptography/*.md
 /Carbon.Cryptography/LICENSE
+/Carbon.Cryptography/Modules/
 /Carbon.Cryptography/NOTICE
+/PSModules/
 /Tests/.password
 /Tests/PASSWORD
 /Tests/private.pfx
