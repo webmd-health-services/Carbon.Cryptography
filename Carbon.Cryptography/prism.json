@@ -2,7 +2,8 @@
     "PSModules": [
         {
           "Name": "Carbon.Accounts",
-          "Version": "2.*"
+          "Version": "2.*",
+          "AllowPrerelease": true
         },
         {
             "Name": "Carbon.Core",
@@ -10,7 +11,8 @@
         },
         {
             "Name": "Carbon.Security",
-            "Version": "1.*"
+            "Version": "1.*",
+            "AllowPrerelease": true
         }
     ]
 }

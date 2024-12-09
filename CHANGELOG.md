@@ -3,7 +3,13 @@
 
 # Carbon.Cryptography Changelog
 
+## 3.4.3
+
+Removing extra nested module scope.
+
 ## 3.4.2
+
+> Released 3 Dec 2024
 
 Change to the layout of internal, private, nested dependencies.
 
