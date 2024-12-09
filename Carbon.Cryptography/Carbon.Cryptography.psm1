@@ -40,7 +40,7 @@ $moduleBinRoot | Out-Null # To make the PSScriptAnalyzer squiggle go away.
 
 $psModulesDirPath = Join-Path -Path $script:moduleRoot -ChildPath 'Modules' -Resolve
 
-Import-Module -Name (Join-Path -Path $psModulesDirPath -ChildPath 'Carbon.Core') `
+Import-Module -Name (Join-Path -Path $psModulesDirPath -ChildPath 'Carbon.Core\Carbon.Core.psm1') `
               -Function @(
                     'ConvertTo-CBase64',
                     'Get-CPathProvider',
@@ -49,11 +49,11 @@ Import-Module -Name (Join-Path -Path $psModulesDirPath -ChildPath 'Carbon.Core')
                 ) `
               -Verbose:$false
 
-Import-Module -Name (Join-Path -Path $psModulesDirPath -ChildPath 'Carbon.Accounts') `
+Import-Module -Name (Join-Path -Path $psModulesDirPath -ChildPath 'Carbon.Accounts\Carbon.Accounts.psm1') `
               -Function @('Resolve-CPrincipal', 'Resolve-CPrincipalName', 'Test-CPrincipal') `
               -Verbose:$false
 
-Import-Module -Name (Join-Path -Path $psModulesDirPath -ChildPath 'Carbon.Security') `
+Import-Module -Name (Join-Path -Path $psModulesDirPath -ChildPath 'Carbon.Security\Carbon.Security.psm1') `
               -Function @(
                     'Get-CAcl',
                     'Get-CPermission',

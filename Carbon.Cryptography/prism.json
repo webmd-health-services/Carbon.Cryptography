@@ -1,8 +1,8 @@
 {
     "PSModules": [
         {
-          "Name": "Carbon.Accounts",
-          "Version": "2.*"
+            "Name": "Carbon.Accounts",
+            "Version": "2.*"
         },
         {
             "Name": "Carbon.Core",
