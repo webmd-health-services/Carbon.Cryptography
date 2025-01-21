@@ -3,7 +3,14 @@
 
 # Carbon.Cryptography Changelog
 
+## 3.4.4
+
+* Fixed: `Find-CCertificate` and `Find-CTlsCertificate` fail to find a certificate by hostname if the hostname isn't
+  the last or only item in a certificate's list of subject alternate names.
+
 ## 3.4.3
+
+> Released 10 Dec 2024
 
 Removing extra nested module scope.
 

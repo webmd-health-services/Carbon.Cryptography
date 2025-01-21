@@ -180,6 +180,12 @@ Describe 'Find-CCertificate' {
         ThenFound 'CN=*.test.example.com'
     }
 
+    It 'finds certificate by penultimate subject alternate name' {
+        GivenCertificate -For 'CN=*.carbon' -WithDnsNames @('*.one.carbon', '*.two.carbon')
+        WhenFinding @{ HostName = '*.one.carbon' }
+        ThenFound 'CN=*.carbon'
+    }
+
     It 'should find wildcard hostname using subject alternate name with wildcard' {
         GivenCertificate -For 'CN=*.example.com' -WithDnsNames @('*.example.com')
         WhenFinding @{ HostName = '*.example.com' }
