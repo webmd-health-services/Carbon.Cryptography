@@ -184,6 +184,7 @@ function Find-CCertificate
 
                 foreach ($nameItem in $InputObject)
                 {
+                    # If the first character of the item is a wildcard character.
                     if ($nameItem[0] -eq '*')
                     {
                         # Wildcards in certificates only ever match one "level" of a domain name and must be on the very left.
@@ -197,6 +198,12 @@ function Find-CCertificate
                     else
                     {
                         $success = $nameItem -like $Value
+                    }
+
+                    # Found a match.
+                    if ($success)
+                    {
+                        break
                     }
                 }
 
