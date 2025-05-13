@@ -421,18 +421,24 @@ Describe 'Get-CCertificate' {
             $cert = Get-CCertificate @getArgs -ErrorAction SilentlyContinue
 
             # Friendly names are Windows-only.
-            if ((Test-Path -Path 'variable:*FriendlyName*') -and (-not (Test-FriendlyName -IsSupported)) )
+            if (((Test-Path -Path 'variable:FriendlyName') -or (Test-Path -Path 'variable:LiteralFriendlyName')) -and `
+               (-not (Test-FriendlyName -IsSupported)) )
             {
                 $cert | Should -BeNullOrEmpty
                 return
             }
 
-            $storeParam = @{ 'FromStore' = $ExpectedStore }
+            $thenArgs = @{ 'FromStore' = $ExpectedStore }
             if ($usingCustomStore)
             {
-                $storeParam = @{ 'FromCustomStore' = $ExpectedStore }
+                $thenArgs = @{ 'FromCustomStore' = $ExpectedStore }
             }
-            ThenReturnedCert $cert -WithPath $ExpectedPath -For 'CurrentUser' @storeParam
+
+            if ((Test-Path -Path 'cert:') -and (Test-Path -Path 'variable:ExpectedPath'))
+            {
+                $thenArgs['WithPath'] = $ExpectedPath
+            }
+            ThenReturnedCert $cert -For 'CurrentUser' @thenArgs
         }
     }
 

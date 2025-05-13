@@ -3,10 +3,17 @@
 
 # Carbon.Cryptography Changelog
 
+## 3.4.5
+
+Fixed: `Protect-CString` and `Unprotect-CString` fail on Linux and macOS when given a thumbprint to a certificate in the
+.NET certificate stores.
+
 ## 3.4.4
 
-* Fixed: `Find-CCertificate` and `Find-CTlsCertificate` fail to find a certificate by hostname if the hostname isn't
-  the last or only item in a certificate's list of subject alternate names.
+> Released 22 Jan 2025
+
+Fixed: `Find-CCertificate` and `Find-CTlsCertificate` fail to find a certificate by hostname if the hostname isn't the
+last or only item in a certificate's list of subject alternate names.
 
 ## 3.4.3
 

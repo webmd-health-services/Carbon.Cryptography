@@ -146,7 +146,6 @@ function Protect-CString
     #>
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory, Position=0, ValueFromPipeline)]
         # The string to encrypt. Any non-string object you pass will be converted to a string before encrypting by
         # calling the object's `ToString` method.
         #
@@ -155,48 +154,49 @@ function Protect-CString
         # amount of time it takes to encrypt it). Passing a secure string is the most secure usage.
         #
         # The string and secure string bytes are re-encoded as UTF-8 before encrypting.
-        [Object]$String,
+        [Parameter(Mandatory, Position=0, ValueFromPipeline)]
+        [Object] $String,
 
-        [Parameter(Mandatory, ParameterSetName='DPAPICurrentUser')]
         # Encrypts for the current user so that only they can decrypt.
-        [switch]$ForUser,
+        [Parameter(Mandatory, ParameterSetName='DPAPICurrentUser')]
+        [switch] $ForUser,
 
-        [Parameter(Mandatory, ParameterSetName='DPAPILocalMachine')]
         # Encrypts for the current computer so that any user logged into the computer can decrypt.
-        [switch]$ForComputer,
+        [Parameter(Mandatory, ParameterSetName='DPAPILocalMachine')]
+        [switch] $ForComputer,
 
-        [Parameter(Mandatory, ParameterSetName='DPAPIForUser')]
         # Encrypts for a specific user.
-        [pscredential]$Credential,
+        [Parameter(Mandatory, ParameterSetName='DPAPIForUser')]
+        [pscredential] $Credential,
 
-        [Parameter(Mandatory, ParameterSetName='RsaByCertificate')]
         # The public key to use for encrypting.
-        [Security.Cryptography.X509Certificates.X509Certificate2]$Certificate,
+        [Parameter(Mandatory, ParameterSetName='RsaByCertificate')]
+        [Security.Cryptography.X509Certificates.X509Certificate2] $Certificate,
 
-        [Parameter(Mandatory, ParameterSetName='RsaByThumbprint')]
         # The thumbprint of the certificate, found in one of the Windows certificate stores, to use when encrypting. All
         # certificate stores are searched.
-        [String]$Thumbprint,
+        [Parameter(Mandatory, ParameterSetName='RsaByThumbprint')]
+        [String] $Thumbprint,
 
-        [Parameter(Mandatory, ParameterSetName='RsaByPath')]
         # The path to the public key to use for encrypting. Must be to an `X509Certificate2` object.
-        [String]$PublicKeyPath,
+        [Parameter(Mandatory, ParameterSetName='RsaByPath')]
+        [String] $PublicKeyPath,
 
+        # The padding mode to use when encrypting. When using an RSA public key, defaults to
+        # [Security.Cryptography.RSAEncryptionPadding]::OaepSHA1.
         [Parameter(ParameterSetName='RsaByCertificate')]
         [Parameter(ParameterSetName='RsaByPath')]
         [Parameter(ParameterSetName='RsaByThumbprint')]
-        # The padding mode to use when encrypting. When using an RSA public key, defaults to
-        # [Security.Cryptography.RSAEncryptionPadding]::OaepSHA1.
-        [Security.Cryptography.RSAEncryptionPadding]$Padding,
+        [Security.Cryptography.RSAEncryptionPadding] $Padding,
 
-        [Parameter(Mandatory, ParameterSetName='Symmetric')]
         # The key to use to encrypt the secret. Must be a `[securestring]` or an array of bytes. If passing a byte
         # array, # must be 16, 24, or 32 bytes long. If passing a secure string, when it is UTF-8 encoded and converted
         # to a byte # array, that array must also be 16, 24, or 32 bytes long. This code will tell you the length, in
         # bytes, of your plain text key (stored in the `$key`variable):
         #
         #   [Text.Encoding]::Convert([Text.Encoding]::Unicode, [Text.Encoding]::UTF8, [Text.Encoding]::Unicode.GetBytes($key)).Length
-        [Object]$Key
+        [Parameter(Mandatory, ParameterSetName='Symmetric')]
+        [Object] $Key
     )
 
     process
@@ -211,8 +211,8 @@ function Protect-CString
         {
             if( $PSCmdlet.ParameterSetName -eq 'RsaByThumbprint' )
             {
-                $Certificate = Get-Item -Path ('cert:\*\*\{0}' -f $Thumbprint) | Select-Object -First 1
-                if( -not $Certificate )
+                $Certificate = Get-CCertificate -Thumbprint $Thumbprint | Select-Object -First 1
+                if (-not $Certificate)
                 {
                     Write-Error "Certificate with thumbprint ""$($Thumbprint)"" not found."
                     return

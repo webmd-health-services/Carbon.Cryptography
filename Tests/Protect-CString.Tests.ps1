@@ -28,54 +28,78 @@ Describe 'Protect-CString' {
 
     $isNotOnWindows = (Test-Path -Path 'variable:IsWindows') -and -not $IsWindows
 
-    It 'should protect string' -Skip:$isNotOnWindows {
-        $cipherText = Protect-CString -String 'Hello World!' -ForUser
-        Assert-IsBase64EncodedString( $cipherText )
-    }
+    Context 'DPAPI' -Skip:$isNotOnWindows {
+        It 'should protect string' {
+            $cipherText = Protect-CString -String 'Hello World!' -ForUser
+            Assert-IsBase64EncodedString( $cipherText )
+        }
 
-    It 'should protect string with scope' -Skip:$isNotOnWindows {
-        $user = Protect-CString -String 'Hello World' -ForUser
-        $machine = Protect-CString -String 'Hello World' -ForComputer
-        $machine | Should -Not -Be $user -Because 'encrypting at different scopes resulted in the same string'
-    }
+        It 'should protect string with scope' {
+            $user = Protect-CString -String 'Hello World' -ForUser
+            $machine = Protect-CString -String 'Hello World' -ForComputer
+            $machine | Should -Not -Be $user -Because 'encrypting at different scopes resulted in the same string'
+        }
 
-    It 'should protect strings in pipeline' -Skip:$isNotOnWindows {
-        $secrets = @('Foo','Fizz','Buzz','Bar') | Protect-CString -ForUser
-        $secrets.Length | Should -Be 4 -Because 'Didn''t encrypt all items in the pipeline.'
-        foreach( $secret in $secrets )
-        {
-            Assert-IsBase64EncodedString $secret
+        It 'should protect strings in pipeline' {
+            $secrets = @('Foo','Fizz','Buzz','Bar') | Protect-CString -ForUser
+            $secrets.Length | Should -Be 4 -Because 'Didn''t encrypt all items in the pipeline.'
+            foreach( $secret in $secrets )
+            {
+                Assert-IsBase64EncodedString $secret
+            }
+        }
+
+        It 'handles all printable characters' {
+            # special chars to make sure they get handled correctly
+            $string = ' f u b a r '' " > ~!@#$%^&*()_+`-={}|:"<>?[]\;,./'
+            $protectedString = Protect-CString -String $string -Credential $script:testUserCred
+            $protectedString |
+                Should -Not -BeNullOrEmpty "Failed to protect a string as user $($script:testUserCred.UserName)."
+
+            $decrypedString = Invoke-TCPowerShell -ArgumentList @(
+                                                    '-NonInteractive',
+                                                    '-File',
+                                                    $script:unprotectStringPath,
+                                                    '-ProtectedString',
+                                                    $protectedString
+                                                ) `
+                                                -Credential $script:testUserCred
+            $decrypedString | Should -Be $string
         }
     }
 
-    It 'should encrypt from cert store by thumbprint' -Skip:$isNotOnWindows {
-        $cert = Get-ChildItem -Path cert:\* -Recurse |
-                    Where-Object { $_ | Get-Member 'PublicKey' } |
-                    Where-Object { $_.PublicKey.Key -is [Security.Cryptography.RSA] } |
-                    Select-Object -First 1
+    It 'encrypts from cert store by thumbprint' {
+        $cert =
+            Get-CCertificate |
+            Where-Object { $_ | Get-Member 'PublicKey' } |
+            Where-Object { $_.PublicKey.Key -is [Security.Cryptography.RSA] } |
+            Select-Object -First 1
         $cert | Should -Not -BeNullOrEmpty
         $secret = [Guid]::NewGuid().ToString().Substring(0,20)
         $expectedCipherText = Protect-CString -String $secret -Thumbprint $cert.Thumbprint
         $expectedCipherText | Should -Not -BeNullOrEmpty
     }
 
-    It 'should encrypt from cert store by cert path' -Skip:$isNotOnWindows {
-        $cert = Get-ChildItem -Path cert:\* -Recurse |
-                    Where-Object { $_ | Get-Member 'PublicKey' } |
-                    Where-Object { $_.PublicKey.Key -is [Security.Cryptography.RSA] } |
-                    Select-Object -First 1
-        $cert | Should -Not -BeNullOrEmpty
-        $secret = [Guid]::NewGuid().ToString().Substring(0,20)
-        $certPath = Join-Path -Path 'cert:\' -ChildPath (Split-Path -NoQualifier -Path $cert.PSPath)
-        $expectedCipherText = Protect-CString -String $secret -PublicKeyPath $certPath
-        $expectedCipherText | Should -Not -BeNullOrEmpty
-    }
+    Context 'Certificate Provider' -Skip:$isNotOnWindows {
+        It 'encrypts from cert store by cert path' {
+            $cert =
+                Get-ChildItem -Path 'cert:\*' -Recurse |
+                Where-Object { $_ | Get-Member 'PublicKey' } |
+                Where-Object { $_.PublicKey.Key -is [Security.Cryptography.RSA] } |
+                Select-Object -First 1
+            $cert | Should -Not -BeNullOrEmpty
+            $secret = [Guid]::NewGuid().ToString().Substring(0,20)
+            $certPath = Join-Path -Path 'cert:\' -ChildPath (Split-Path -NoQualifier -Path $cert.PSPath)
+            $expectedCipherText = Protect-CString -String $secret -PublicKeyPath $certPath
+            $expectedCipherText | Should -Not -BeNullOrEmpty
+        }
 
-    It 'should handle path not found' -Skip:$isNotOnWindows {
-        $ciphertext = Protect-CString -String 'fubar' -PublicKeyPath 'cert:\currentuser\fubar' -ErrorAction SilentlyContinue
-        $Global:Error.Count | Should -BeGreaterThan 0
-        $Global:Error[0] | Should -Match 'not found'
-        $ciphertext | Should -BeNullOrEmpty
+        It 'should handle path not found' {
+            $ciphertext = Protect-CString -String 'fubar' -PublicKeyPath 'cert:\currentuser\fubar' -ErrorAction SilentlyContinue
+            $Global:Error.Count | Should -BeGreaterThan 0
+            $Global:Error[0] | Should -Match 'not found'
+            $ciphertext | Should -BeNullOrEmpty
+        }
     }
 
     It 'should encrypt with certificate' {
@@ -179,23 +203,6 @@ Describe 'Protect-CString' {
                                             -PrivateKeyPath $script:privateKeyFilePath `
                                             -Padding ([Security.Cryptography.RSAEncryptionPadding]::Pkcs1)
         $revealedSecret | Convert-CSecureStringToString | Should -Be $secret
-    }
-
-    It 'should protect that string using DPAPI' -Skip:$isNotOnWindows {
-        # special chars to make sure they get handled correctly
-        $string = ' f u b a r '' " > ~!@#$%^&*()_+`-={}|:"<>?[]\;,./'
-        $protectedString = Protect-CString -String $string -Credential $script:testUserCred
-        $protectedString | Should -Not -BeNullOrEmpty "Failed to protect a string as user $($script:testUserCred.UserName)."
-
-        $decrypedString = Invoke-TCPowerShell -ArgumentList @(
-                                                '-NonInteractive',
-                                                '-File',
-                                                $script:unprotectStringPath,
-                                                '-ProtectedString',
-                                                $protectedString
-                                            ) `
-                                            -Credential $script:testUserCred
-        $decrypedString | Should -Be $string
     }
 
     $keySizes = @( 128, 192, 256 )
