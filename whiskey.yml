@@ -79,11 +79,8 @@ Build:
             ExcludePath:
             - "*\\Convert-CSecureStringToString.Tests.ps1"
             - "*\\Find-CTlsCertificate.Tests.ps1"
-            - "*\\Get-CCertificate.Tests.ps1"
             - "*\\New-CRsaKeyPair.Tests.ps1"
-            - "*\\Protect-CString.Tests.ps1"
             - "*\\Uninstall-CCertificate.Tests.ps1"
-            - "*\\Unprotect-CString.Tests.ps1"
             Throw: true
         TestResult:
             Enabled: true
@@ -107,7 +104,4 @@ Build:
 - Pester4:
     Script:
     - Tests\Convert-CSecureStringToString.Tests.ps1
-    - Tests\Get-CCertificate.Tests.ps1
-    - Tests\Protect-CString.Tests.ps1
     - Tests\Uninstall-CCertificate.Tests.ps1
-    - Tests\Unprotect-CString.Tests.ps1
