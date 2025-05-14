@@ -10,12 +10,15 @@ BeforeAll {
     $script:originalText = $null
     $script:secret = [Guid]::NewGuid().ToString()
     $script:rsaCipherText = $null
-    $script:publicKeyPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestPublicKey.cer' -Resolve
-    $script:privateKeyPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestPrivateKey.pfx' -Resolve
-    $script:publicKey2Path = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestPublicKey2.cer' -Resolve
-    $script:privateKey2Path = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestPrivateKey2.pfx' -Resolve
+    $script:publicKeyPath = Join-Path -Path $PSScriptRoot -ChildPath 'Certificates\UnprotectCString.pem' -Resolve
+    $script:publicKey = Get-CCertificate -Path $script:publicKeyPath
+    $script:privateKeyUnprotectedPath =
+        Join-Path -Path $PSScriptRoot -ChildPath 'Certificates\UnprotectCStringUnprotected.pfx' -Resolve
+    $script:privateKeyProtectedPath =
+        Join-Path -Path $PSScriptRoot -ChildPath 'Certificates\UnprotectCStringProtected.pfx' -Resolve
+    $script:privateKey = Get-CCertificate -Path $script:privateKeyUnprotectedPath
 
-    $script:rsaCipherText = Protect-CString -String $script:secret -PublicKeyPath $script:privateKeyPath
+    $script:rsaCipherText = Protect-CString -String $script:secret -PublicKeyPath $script:publicKeyPath
 
     $script:certsToUninstall = [Collections.ArrayList]::New()
 
@@ -25,7 +28,6 @@ BeforeAll {
             [Parameter(Mandatory, Position=0)]
             [String] $Path,
             [switch] $Installed,
-            [String] $For,
             [String] $In
         )
 
@@ -41,7 +43,7 @@ BeforeAll {
             }
         }
 
-        $cert = Install-CCertificate -Path $Path -StoreLocation $For -StoreName $In -PassThru @exportableArg
+        $cert = Install-CCertificate -Path $Path -StoreLocation CurrentUser -StoreName $In -PassThru @exportableArg
         [void]$script:certsToUninstall.Add($cert)
         return $cert
     }
@@ -114,7 +116,7 @@ Describe 'Unprotect-CString' {
     }
 
     It 'should handle thumbprint to cert with no private key' {
-        $cert = GivenCertificate $script:publicKeyPath -Installed -For CurrentUser -In My
+        $cert = GivenCertificate $script:publicKeyPath -Installed -In My
         $cert | Should -Not -BeNullOrEmpty
         $revealedSecret = Unprotect-CString -ProtectedString $script:rsaCipherText `
                                             -Thumbprint $cert.Thumbprint `
@@ -127,8 +129,8 @@ Describe 'Unprotect-CString' {
 
     Context 'Cerificate Provider' -Skip:$isNotOnWindows {
         It 'should decrypt with path to cert in store' {
-            $cert = GivenCertificate $script:privateKeyPath -Installed -For CurrentUser -In My
-            $certStorePath = Join-Path -Path 'cert:\CurrentUser\My' -ChildPath $cert.Thumbprint
+            GivenCertificate $script:privateKeyUnprotectedPath -Installed -In My
+            $certStorePath = Join-Path -Path 'cert:\CurrentUser\My' -ChildPath $script:privateKey.Thumbprint
             $revealedSecret = Unprotect-CString -ProtectedString $script:rsaCipherText -PrivateKeyPath $certStorePath
             $Global:Error.Count | Should -Be 0
             $revealedSecret | Convert-CSecureStringToString | Should -Be $script:secret
@@ -136,18 +138,19 @@ Describe 'Unprotect-CString' {
     }
 
     It 'should decrypt with thumbprint' {
-        $cert = GivenCertificate $script:privateKeyPath -Installed -For CurrentUser -In My
-        $revealedSecret = Unprotect-CString -ProtectedString $script:rsaCipherText -Thumbprint $cert.Thumbprint
+        GivenCertificate $script:privateKeyUnprotectedPath -Installed -In My
+        $revealedSecret =
+            Unprotect-CString -ProtectedString $script:rsaCipherText -Thumbprint $script:privateKey.Thumbprint
         $Global:Error.Count | Should -Be 0
         $revealedSecret | Convert-CSecureStringToString | Should -Be $script:secret
     }
 
     It 'should handle when cert is installed multiple times with private key' {
-        $cert = GivenCertificate $script:privateKeyPath -Installed -For CurrentUser -In My
-        $null = GivenCertificate $script:privateKeyPath -Installed -For CurrentUser -In CertificateAuthority
+        GivenCertificate $script:privateKeyUnprotectedPath -Installed -In My
+        GivenCertificate $script:privateKeyUnprotectedPath -Installed -In CertificateAuthority
 
         $revealedSecret = Unprotect-CString -ProtectedString $script:rsaCipherText `
-                                            -Thumbprint $cert.Thumbprint `
+                                            -Thumbprint $script:privateKey.Thumbprint `
                                             -WarningVariable 'warnings' `
                                             -WarningAction SilentlyContinue
         $Global:Error.Count | Should -Be 0
@@ -156,20 +159,24 @@ Describe 'Unprotect-CString' {
     }
 
     It 'should handle when cert is installed multiple times, once without the private key' {
-        $cert = GivenCertificate $script:privateKeyPath -Installed -For CurrentUser -In My
-        $null = GivenCertificate $script:publicKeyPath -Installed -For CurrentUser -In CertificateAuthority
+        GivenCertificate $script:privateKeyUnprotectedPath -Installed -In My
+        GivenCertificate $script:publicKeyPath -Installed -In CertificateAuthority
 
-        $revealedSecret = Unprotect-CString -ProtectedString $script:rsaCipherText -Thumbprint $cert.Thumbprint -WarningVariable 'warnings'
+        $revealedSecret = Unprotect-CString -ProtectedString $script:rsaCipherText `
+                                            -Thumbprint $script:privateKey.Thumbprint `
+                                            -WarningVariable 'warnings'
         $Global:Error.Count | Should -Be 0
         $revealedSecret | Convert-CSecureStringToString | Should -Be $script:secret
         $warnings | Should -BeNullOrEmpty
     }
 
     It 'should handle when cert is installed multiple times, all without the private key' {
-        $cert = GivenCertificate $script:publicKeyPath -Installed -For CurrentUser -In My
-        $null = GivenCertificate $script:publicKeyPath -Installed -For CurrentUser -In CertificateAuthority
+        GivenCertificate $script:publicKeyPath -Installed -In My
+        GivenCertificate $script:publicKeyPath -Installed -In CertificateAuthority
 
-        $revealedSecret = Unprotect-CString -ProtectedString $script:rsaCipherText -Thumbprint $cert.Thumbprint -ErrorAction SilentlyContinue
+        $revealedSecret = Unprotect-CString -ProtectedString $script:rsaCipherText `
+                                            -Thumbprint $script:privateKey.Thumbprint `
+                                            -ErrorAction SilentlyContinue
         $Global:Error.Count | Should -BeGreaterThan 0
         $Global:Error[0] | Should -Match '^Found 2 certificates .+ but none of them contain a private key or the private key is null'
         $revealedSecret | Should -BeNullOrEmpty
@@ -177,30 +184,31 @@ Describe 'Unprotect-CString' {
 
     It 'should load certificate from file' {
         $revealedSecret =
-            Unprotect-CString -ProtectedString $script:rsaCipherText -PrivateKeyPath $script:privateKeyPath
+            Unprotect-CString -ProtectedString $script:rsaCipherText -PrivateKeyPath $script:privateKeyUnprotectedPath
         $Global:Error.Count | Should -Be 0
         $revealedSecret | Convert-CSecureStringToString | Should -Be $script:secret
     }
 
     It 'should handle missing private key' {
-        $revealedSecret = Unprotect-CString -ProtectedString $script:rsaCipherText -PrivateKeyPath $script:publicKeyPath -ErrorAction SilentlyContinue
+        $revealedSecret = Unprotect-CString -ProtectedString $script:rsaCipherText `
+                                            -PrivateKeyPath $script:publicKeyPath `
+                                            -ErrorAction SilentlyContinue
         $Global:Error.Count | Should -BeGreaterThan 0
         $Global:Error[0] | Should -Match 'doesn''t have a private key'
         $revealedSecret | Convert-CSecureStringToString | Should -BeNullOrEmpty
     }
 
     It 'should load password protected private key' {
-        $cipherText = Protect-CString -String $script:secret -PublicKeyPath $script:publicKey2Path
+        $cipherText = Protect-CString -String $script:secret -PublicKeyPath $script:publicKeyPath
         $revealedText = Unprotect-CString -ProtectedString $cipherText `
-                                          -PrivateKeyPath $script:privateKey2Path `
+                                          -PrivateKeyPath $script:privateKeyProtectedPath `
                                           -Password (ConvertTo-SecureString -String 'fubar' -AsPlainText -Force)
         $Global:Error.Count | Should -Be 0
         $revealedText | Convert-CSecureStringToString | Should -Be $script:secret
     }
 
     It 'should decrypt with certificate' {
-        $cert = Get-CCertificate -Path $script:privateKeyPath
-        $revealedSecret = Unprotect-CString -ProtectedString $script:rsaCipherText -Certificate $cert
+        $revealedSecret = Unprotect-CString -ProtectedString $script:rsaCipherText -Certificate $script:privateKey
         $Global:Error.Count | Should -Be 0
         $revealedSecret | Convert-CSecureStringToString | Should -Be $script:secret
     }
@@ -256,7 +264,7 @@ Describe 'Unprotect-CString' {
 
     Context 'when user does not have access to private key' {
         It 'fails' {
-            $cert = Get-CCertificate -Path $script:privateKeyPath
+            $cert = Get-CCertificate -Path $script:privateKeyUnprotectedPath
             $cert | Add-member -MemberType NoteProperty -Name 'PrivateKey' -Value $null -Force
             $cert | Add-Member -MemberType NoteProperty -Name 'HasPrivateKey' -Value $true -Force
 
@@ -270,8 +278,8 @@ Describe 'Unprotect-CString' {
             {
                 $Global:Error.Clear()
                 Unprotect-CString -ProtectedString 'not encrypted' `
-                                -PrivateKeyPath $script:privateKeyPath `
-                                -ErrorAction SilentlyContinue |
+                                  -PrivateKeyPath $script:privateKeyUnprotectedPath `
+                                  -ErrorAction SilentlyContinue |
                     Should -BeNullOrEmpty
                 # Different error message on different versions of .NET.
                 $Global:Error | Should -Match 'decoding OAEP padding|length of the data to decrypt'

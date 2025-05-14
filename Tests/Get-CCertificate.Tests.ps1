@@ -20,13 +20,6 @@ BeforeAll {
 
     $script:certsToUninstall = [Collections.ArrayList]::New()
 
-    Get-CCertificate -Path (Join-Path -Path $PSScriptRoot -ChildPath 'Resources\*') -ErrorAction Ignore |
-        Where-Object { Get-CCertificate -Thumbprint $_.Thumbprint  } |
-        ForEach-Object {
-            Write-Error "Certificate $($_.Subject) $($_.Thumbprint) is still installed."
-            Uninstall-CCertificate -Thumbprint $_.Thumbprint
-        }
-
     function Assert-TestCert
     {
         param(

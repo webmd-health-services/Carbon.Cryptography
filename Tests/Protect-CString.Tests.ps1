@@ -8,22 +8,62 @@ BeforeAll {
 
     & (Join-Path -Path $PSScriptRoot -ChildPath 'Initialize-Test.ps1' -Resolve)
 
-    $script:publicKeyFilePath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestPublicKey.cer' -Resolve
-    $script:privateKeyFilePath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestPrivateKey.pfx' -Resolve
-    $script:dsaKeyPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestDsaKey.cer' -Resolve
+    $script:publicKeyFilePath = Join-Path -Path $PSScriptRoot -ChildPath 'Certificates\ProtectCString.pem' -Resolve
+    $script:publicKey = Get-CCertificate -Path $script:publicKeyFilePath
+    $script:privateKeyFilePath =
+        Join-Path -Path $PSScriptRoot -ChildPath 'Certificates\ProtectCStringUnprotected.pfx' -Resolve
+    $script:privateKey = Get-CCertificate -Path $script:privateKeyFilePath
+    # installed by init.ps1.
     $script:unprotectStringPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\Unprotect-CString.ps1' -Resolve
     $script:testUserCred = Get-TestUserCredential -Name 'CPtString'
+    $script:certsToUninstall = [Collections.ArrayList]::New()
 
     function Assert-IsBase64EncodedString($String)
     {
         $String | Should -Not -BeNullOrEmpty 'Didn''t encrypt cipher text.'
         { [Convert]::FromBase64String( $String ) } | Should -Not -Throw
     }
+
+    function GivenCertificate
+    {
+        param(
+            [Parameter(Mandatory, Position=0)]
+            [String] $Path,
+            [switch] $Installed,
+            [String] $In
+        )
+
+        # macOS requires private keys be exportable.
+        $exportableArg = @{}
+        if ((Test-Path -Path 'variable:IsMacOS') -and $IsMacOS)
+        {
+            $cert = Get-CCertificate -Path $Path
+            Write-Verbose "${Path}  HasPrivateKey $($cert.HasPrivateKey)" -Verbose
+            if ($cert.HasPrivateKey)
+            {
+                $exportableArg['Exportable'] = $True
+            }
+        }
+
+        $cert = Install-CCertificate -Path $Path -StoreLocation CurrentUser -StoreName $In -PassThru @exportableArg
+        [void]$script:certsToUninstall.Add($cert)
+        return $cert
+    }
 }
 
 Describe 'Protect-CString' {
     BeforeEach {
+        $script:certsToUninstall.Clear()
         $Global:Error.Clear()
+    }
+
+    AfterEach {
+        foreach ($cert in $script:certsToUninstall)
+        {
+            Uninstall-CCertificate -Thumbprint $cert.Thumbprint `
+                                   -StoreLocation $cert.StoreLocation `
+                                   -StoreName $cert.StoreName
+        }
     }
 
     $isNotOnWindows = (Test-Path -Path 'variable:IsWindows') -and -not $IsWindows
@@ -69,33 +109,25 @@ Describe 'Protect-CString' {
     }
 
     It 'encrypts from cert store by thumbprint' {
-        $cert =
-            Get-CCertificate |
-            Where-Object { $_ | Get-Member 'PublicKey' } |
-            Where-Object { $_.PublicKey.Key -is [Security.Cryptography.RSA] } |
-            Select-Object -First 1
-        $cert | Should -Not -BeNullOrEmpty
+        GivenCertificate $script:publicKeyFilePath -Installed -In My
         $secret = [Guid]::NewGuid().ToString().Substring(0,20)
-        $expectedCipherText = Protect-CString -String $secret -Thumbprint $cert.Thumbprint
+        $expectedCipherText = Protect-CString -String $secret -Thumbprint $script:publicKey.Thumbprint
         $expectedCipherText | Should -Not -BeNullOrEmpty
     }
 
     Context 'Certificate Provider' -Skip:$isNotOnWindows {
         It 'encrypts from cert store by cert path' {
-            $cert =
-                Get-ChildItem -Path 'cert:\*' -Recurse |
-                Where-Object { $_ | Get-Member 'PublicKey' } |
-                Where-Object { $_.PublicKey.Key -is [Security.Cryptography.RSA] } |
-                Select-Object -First 1
-            $cert | Should -Not -BeNullOrEmpty
+            GivenCertificate $script:publicKeyFilePath -Installed -In My
+            $certPath = Join-Path -Path 'Cert:\CurrentUser\My' -ChildPath $script:publicKey.Thumbprint
             $secret = [Guid]::NewGuid().ToString().Substring(0,20)
-            $certPath = Join-Path -Path 'cert:\' -ChildPath (Split-Path -NoQualifier -Path $cert.PSPath)
             $expectedCipherText = Protect-CString -String $secret -PublicKeyPath $certPath
             $expectedCipherText | Should -Not -BeNullOrEmpty
         }
 
         It 'should handle path not found' {
-            $ciphertext = Protect-CString -String 'fubar' -PublicKeyPath 'cert:\currentuser\fubar' -ErrorAction SilentlyContinue
+            $ciphertext = Protect-CString -String 'fubar' `
+                                          -PublicKeyPath 'cert:\currentuser\fubar' `
+                                          -ErrorAction SilentlyContinue
             $Global:Error.Count | Should -BeGreaterThan 0
             $Global:Error[0] | Should -Match 'not found'
             $ciphertext | Should -BeNullOrEmpty
@@ -103,20 +135,18 @@ Describe 'Protect-CString' {
     }
 
     It 'should encrypt with certificate' {
-        $cert = Get-CCertificate -Path $script:publicKeyFilePath
-        $cert | Should -Not -BeNullOrEmpty
         $secret = [Guid]::NewGuid().ToString()
-        $ciphertext = Protect-CString -String $secret -Certificate $cert
+        $ciphertext = Protect-CString -String $secret -Certificate $script:publicKey
         $ciphertext | Should -Not -BeNullOrEmpty
         $ciphertext | Should -Not -Be $secret
-        $privateKey = Get-CCertificate -Path $script:privateKeyFilePath
-        (Unprotect-CString -ProtectedString $ciphertext -Certificate $privateKey) |
+        (Unprotect-CString -ProtectedString $ciphertext -Certificate $script:privateKey) |
             Convert-CSecureStringToString |
             Should -Be $secret
     }
 
     It 'should handle not getting an rsa certificate' {
-        $cert = Get-CCertificate -Path $script:dsaKeyPath
+        $dsaKeyPath = Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestDsaKey.cer' -Resolve
+        $cert = Get-CCertificate -Path $dsaKeyPath
         $cert | Should -Not -BeNullOrEmpty
         $secret = [Guid]::NewGuid().ToString()
         $ciphertext = Protect-CString -String $secret -Certificate $cert -ErrorAction SilentlyContinue
@@ -126,38 +156,34 @@ Describe 'Protect-CString' {
     }
 
     It 'should handle thumbprint not in store' {
-       $ciphertext = Protect-CString -String 'fubar' -Thumbprint '1111111111111111111111111111111111111111' -ErrorAction SilentlyContinue
+       $ciphertext = Protect-CString -String 'fubar' `
+                                     -Thumbprint '1111111111111111111111111111111111111111' `
+                                     -ErrorAction SilentlyContinue
        $Global:Error.Count | Should -BeGreaterThan 0
        $Global:Error[0] | Should -Match 'not found'
        $ciphertext | Should -BeNullOrEmpty
     }
 
     It 'should encrypt from certificate file' {
-        $cert = Get-CCertificate -Path $script:publicKeyFilePath
-        $cert | Should -Not -BeNullOrEmpty
         $secret = [Guid]::NewGuid().ToString()
         $ciphertext = Protect-CString -String $secret -PublicKeyPath $script:publicKeyFilePath
         $ciphertext | Should -Not -BeNullOrEmpty
         $ciphertext | Should -Not -Be $secret
-        $privateKey = Get-CCertificate -Path $script:privateKeyFilePath
-        (Unprotect-CString -ProtectedString $ciphertext -Certificate $privateKey) |
+        (Unprotect-CString -ProtectedString $ciphertext -Certificate $script:privateKey) |
             Convert-CSecureStringToString |
             Should -Be $secret
     }
 
     It 'should encrypt a secure string' {
-        $cert = Get-CCertificate -Path $script:publicKeyFilePath
-        $cert | Should -Not -BeNullOrEmpty
         $password = 'waffles'
         $secret = New-Object -TypeName System.Security.SecureString
         $password.ToCharArray() | ForEach-Object { $secret.AppendChar($_) }
 
-        $ciphertext = Protect-CString -String $secret -PublicKeyPath $script:publicKeyFilePath
+        $ciphertext = Protect-CString -String $secret -Certificate $script:publicKey
         $ciphertext | Should -Not -BeNullOrEmpty
         $ciphertext | Should -Not -Be $secret
-        $privateKey = Get-CCertificate -Path $script:privateKeyFilePath
         $decryptedPassword =
-            Unprotect-CString -ProtectedString $ciphertext -Certificate $privateKey | Convert-CSecureStringToString
+            Unprotect-CString -ProtectedString $ciphertext -Certificate $script:privateKey | Convert-CSecureStringToString
         $decryptedPassword | Should -Be $password
         $passwordBytes = [Text.Encoding]::Unicode.GetBytes($password)
         $decryptedBytes = [Text.Encoding]::Unicode.GetBytes($decryptedPassword)
@@ -166,28 +192,23 @@ Describe 'Protect-CString' {
     }
 
     It 'should convert passed objects to string' {
-        $cert = Get-CCertificate -Path $script:publicKeyFilePath
-        $cert | Should -Not -BeNullOrEmpty
         $object = @{}
-        $cipherText = Protect-CString -String $object -PublicKeyPath $script:publicKeyFilePath
+        $cipherText = Protect-CString -String $object -Certificate $script:publicKey
         $cipherText | Should -Not -BeNullOrEmpty
         $cipherText | Should -Not -Be $object
-        $privateKey = Get-CCertificate -Path $script:privateKeyFilePath
         Assert-IsBase64EncodedString( $cipherText )
-        (Unprotect-CString -ProtectedString $cipherText -Certificate $privateKey) |
+        (Unprotect-CString -ProtectedString $cipherText -Certificate $script:privateKey) |
             Convert-CSecureStringToString |
             Should -Be $object.ToString()
     }
 
     It 'should encrypt from certificate file with relative path' {
-        $cert = Get-CCertificate -Path $script:publicKeyFilePath
-        $cert | Should -Not -BeNullOrEmpty
         $secret = [Guid]::NewGuid().ToString()
-        $ciphertext = Protect-CString -String $secret -PublicKeyPath (Resolve-Path -Path $script:publicKeyFilePath -Relative)
+        $ciphertext =
+            Protect-CString -String $secret -PublicKeyPath (Resolve-Path -Path $script:publicKeyFilePath -Relative)
         $ciphertext | Should -Not -BeNullOrEmpty
         $ciphertext | Should -Not -Be $secret
-        $privateKey = Get-CCertificate -Path $script:privateKeyFilePath
-        (Unprotect-CString -ProtectedString $ciphertext -Certificate $privateKey) |
+        (Unprotect-CString -ProtectedString $ciphertext -Certificate $script:privateKey) |
             Convert-CSecureStringToString |
             Should -Be $secret
     }
@@ -195,12 +216,12 @@ Describe 'Protect-CString' {
     It 'should use direct encryption padding switch' {
         $secret = [Guid]::NewGuid().ToString()
         $ciphertext = Protect-CString -String $secret `
-                                      -PublicKeyPath $script:publicKeyFilePath `
+                                      -Certificate $script:publicKey `
                                       -Padding ([Security.Cryptography.RSAEncryptionPadding]::Pkcs1)
         $ciphertext | Should -Not -BeNullOrEmpty
         $ciphertext | Should -Not -Be $secret
         $revealedSecret = Unprotect-CString -ProtectedString $ciphertext `
-                                            -PrivateKeyPath $script:privateKeyFilePath `
+                                            -Certificate $script:privateKey `
                                             -Padding ([Security.Cryptography.RSAEncryptionPadding]::Pkcs1)
         $revealedSecret | Convert-CSecureStringToString | Should -Be $secret
     }
@@ -251,12 +272,12 @@ Describe 'Protect-CString' {
     # Anyone know how to get DPAPI or AES encryption to fail?
     Context 'RSA' {
         Context 'when encryption fails' {
-            It 'does not throw terminating excetion' {
+            It 'does not throw terminating exception' {
                 {
                     $Global:Error.Clear()
                     # Definitely too big to be encrypted by RSA.
                     $plainText = 'a' * 1000
-                    Protect-CString -String $plainText -PublicKeyPath $script:publicKeyFilePath -ErrorAction SilentlyContinue |
+                    Protect-CString -String $plainText -Certificate $script:publicKey -ErrorAction SilentlyContinue |
                         Should -BeNullOrEmpty
                     # Different error message on different versions of .NET and different platforms
                     #         WinPS 5.1 | Win PS Core 7                      | Linux        | macOS                     | macOS
