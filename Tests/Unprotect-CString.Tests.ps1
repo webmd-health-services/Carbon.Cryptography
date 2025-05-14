@@ -17,6 +17,8 @@ BeforeAll {
 
     $script:rsaCipherText = Protect-CString -String $script:secret -PublicKeyPath $script:privateKeyPath
 
+    $script:certsToUninstall = [Collections.ArrayList]::New()
+
     function GivenCertificate
     {
         param(
@@ -39,21 +41,24 @@ BeforeAll {
             }
         }
 
-        Install-CCertificate -Path $Path -StoreLocation $For -StoreName $In -PassThru @exportableArg
+        $cert = Install-CCertificate -Path $Path -StoreLocation $For -StoreName $In -PassThru @exportableArg
+        [void]$script:certsToUninstall.Add($cert)
+        return $cert
     }
 }
 
 Describe 'Unprotect-CString' {
     BeforeEach {
         $Global:Error.Clear()
+        $script:certsToUninstall.Clear()
     }
 
     AfterEach {
-        $certsToUninstall = @($script:publicKeyPath, $script:publicKey2Path)
-        foreach ($cert in $certsToUninstall)
+        foreach ($cert in $script:certsToUninstall)
         {
-            $thumbprint = Get-CCertificate -Path $cert | Select-Object -ExpandProperty 'Thumbprint'
-            Uninstall-CCertificate -Thumbprint $thumbprint
+            Uninstall-CCertificate -Thumbprint $cert.Thumbprint `
+                                   -StoreLocation $cert.StoreLocation `
+                                   -StoreName $cert.StoreName
         }
     }
 

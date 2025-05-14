@@ -18,6 +18,15 @@ BeforeAll {
 
     & (Join-Path -Path $PSScriptRoot -ChildPath 'Initialize-Test.ps1' -Resolve)
 
+    $script:certsToUninstall = [Collections.ArrayList]::New()
+
+    Get-CCertificate -Path (Join-Path -Path $PSScriptRoot -ChildPath 'Resources\*') -ErrorAction Ignore |
+        Where-Object { Get-CCertificate -Thumbprint $_.Thumbprint  } |
+        ForEach-Object {
+            Write-Error "Certificate $($_.Subject) $($_.Thumbprint) is still installed."
+            Uninstall-CCertificate -Thumbprint $_.Thumbprint
+        }
+
     function Assert-TestCert
     {
         param(
@@ -85,7 +94,12 @@ BeforeAll {
         {
             $optionalParams['Exportable'] = $true
         }
-        Install-CCertificate -Path $FromFile -StoreLocation CurrentUser @optionalParams
+
+        $cert = Install-CCertificate -Path $FromFile -StoreLocation CurrentUser @optionalParams -PassThru
+
+        # $cert | Format-List * | Out-String | Write-Verbose -Verbose
+
+        $script:certsToUninstall.Add($cert)
     }
 
     function ThenReturnedCert
@@ -168,25 +182,20 @@ Describe 'Get-CCertificate' {
         }
 
         $Global:Error.Clear()
+
+        $script:certsToUninstall.Clear()
     }
 
     AfterEach {
-        Get-CCertificate -Path (Join-Path -Path $PSScriptRoot -ChildPath 'Resources\*') -ErrorAction Ignore |
-            ForEach-Object { Uninstall-CCertificate -Thumbprint $_.Thumbprint }
-
-        if( (Test-CustomStore -IsSupported -Location LocalMachine) -and `
-            -not (Test-CustomStore -IsReadOnly -Location LocalMachine) )
+        foreach( $cert in $script:certsToUninstall)
         {
-            Uninstall-CCertificate -Thumbprint $testCertificateThumbprint `
-                                -CustomStoreName 'Carbon' `
-                                -StoreLocation LocalMachine `
-                                -ErrorAction Stop
-        }
-
-        Uninstall-CCertificate -Certificate $TestCert -StoreLocation CurrentUser -StoreName My
-        if( -not (Test-CustomStore -IsReadOnly -Location CurrentUser) )
-        {
-            Uninstall-CCertificate -Certificate $TestCert -StoreLocation CurrentUser -CustomStoreName 'Carbon'
+            $storeNameArg = @{ StoreName = $cert.StoreName }
+            [Security.Cryptography.X509Certificates.StoreName] $storeName = 'My'
+            if (-not [Enum]::TryParse($cert.StoreName, [ref]$storeName))
+            {
+                $storeNameArg = @{ CustomStoreName = $cert.StoreName }
+            }
+            Uninstall-CCertificate -Thumbprint $cert.Thumbprint -StoreLocation $cert.StoreLocation @storeNameArg
         }
     }
 
