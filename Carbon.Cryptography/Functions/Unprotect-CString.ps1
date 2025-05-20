@@ -41,16 +41,15 @@ function Unprotect-CString
     `Unprotect-CString` uses `[Security.Cryptography.Aes]::Create()` to get an object that can do the decryption.
 
     You can only pass a `[securestring]` or byte array as the key. When passing a secure string, make sure that when
-    encoded as UTF-8 and converted to a byte array, it is 16, 24, or 32 bytes long. This code will tell you how long your
-    plain text password is, in UTF-8 bytes:
+    encoded as UTF-8 and converted to a byte array, it is 16, 24, or 32 bytes long. This code will tell you how long
+    your plain text password is, in UTF-8 bytes:
 
         [Text.Encoding]::Convert([Text.Encoding]::Unicode, [Text.Encoding]::UTF8, [Text.Encoding]::Unicode.GetBytes($key)).Length
 
     Symmetric encryption requires a random, unique initialization vector (i.e. IV) everytime you encrypt something. If
     you encrypted the string with `Protect-CString`, one was generated for you and prepended to the encrypted string. If
-    you encrypted the original string yourself, make sure the first 16 bytes of the encrypted text is the IV (since
-    the encrypted bytes are base64 encoded, that means the first 24 characters of the encrypted string should be the
-    IV).
+    you encrypted the original string yourself, make sure the first 16 bytes of the encrypted text is the IV (since the
+    encrypted bytes are base64 encoded, that means the first 24 characters of the encrypted string should be the IV).
 
     The help topic for `Protect-CString` demonstrates how to generate an AES key and how to encode it as a base64
     string.
@@ -86,8 +85,8 @@ function Unprotect-CString
 
     Demonstrates that you can get a secure string returned to you by using the `AsSecureString` switch. This is the most
     secure way to decrypt, as the decrypted text is only in memory as arrays of bytes/chars during decryption. The
-    arrays are immediately cleared after decryption. The decrypted text is never stored as a `[String]` (which remain
-    in memory).
+    arrays are immediately cleared after decryption. The decrypted text is never stored as a `[String]` (which remain in
+    memory).
 
     .EXAMPLE
     Unprotect-CString -ProtectedString $ciphertext -Thumbprint '44A7C27F3353BC53F82318C14490D7E2500B6D9E'
@@ -128,49 +127,49 @@ function Unprotect-CString
     #>
     [CmdletBinding(DefaultParameterSetName='DPAPI')]
     param(
-        [Parameter(Mandatory, Position=0, ValueFromPipeline)]
         # The text to decrypt.
-        [String]$ProtectedString,
+        [Parameter(Mandatory, Position=0, ValueFromPipeline)]
+        [String] $ProtectedString,
 
-        [Parameter(Mandatory, ParameterSetName='RSAByCertificate')]
         # The private key to use for decrypting.
-        [Security.Cryptography.X509Certificates.X509Certificate2]$Certificate,
+        [Parameter(Mandatory, ParameterSetName='RSAByCertificate')]
+        [Security.Cryptography.X509Certificates.X509Certificate2] $Certificate,
 
-        [Parameter(Mandatory, ParameterSetName='RSAByThumbprint')]
         # The thumbprint of the certificate, found in one of the Windows certificate stores, to use when decrypting. All
         # certificate stores are searched. The current user must have permission to the private key. Windows only.
-        [String]$Thumbprint,
+        [Parameter(Mandatory, ParameterSetName='RSAByThumbprint')]
+        [String] $Thumbprint,
 
-        [Parameter(Mandatory, ParameterSetName='RSAByPath')]
         # The path to the private key to use for decrypting. If given a path on the file system, the file must be
         # loadable as a `[Security.X509Certificates.X509Certificate2]` object. On Windows, you can also pass the path
         # to a certificate in PowerShell's `cert:` drive.
-        [String]$PrivateKeyPath,
+        [Parameter(Mandatory, ParameterSetName='RSAByPath')]
+        [String] $PrivateKeyPath,
 
-        [Parameter(ParameterSetName='RSAByPath')]
         # The password for the private key, if it has one. Must be a `[securestring]`.
-        [securestring]$Password,
+        [Parameter(ParameterSetName='RSAByPath')]
+        [securestring] $Password,
 
         [Parameter(ParameterSetName='RSAByCertificate')]
         [Parameter(ParameterSetName='RSAByThumbprint')]
         [Parameter(ParameterSetName='RSAByPath')]
         # The padding mode to use when decrypting. Defaults to `[Security.Cryptography.RSAEncryptionPadding]::OaepSHA1`.
-        [Security.Cryptography.RSAEncryptionPadding]$Padding,
+        [Security.Cryptography.RSAEncryptionPadding] $Padding,
 
-        [Parameter(Mandatory, ParameterSetName='Symmetric')]
         # The key to use to decrypt the secret. Must be a `[securestring]` or an array of bytes. The characters in the
         # secure string are converted to UTF-8 encoding before being converted into bytes. Make sure the key is the
         # correct length when UTF-8 encoded, i.e. make sure the following code returns a 16, 24, or 32 byte byte array
         # (where $key is the plain text key).
         #
         #     [Text.Encoding]::Convert([Text.Encoding]::Unicode, [Text.Encoding]::UTF8, [Text.Encoding]::Unicode.GetBytes($key)).Length
-        [Object]$Key,
+        [Parameter(Mandatory, ParameterSetName='Symmetric')]
+        [Object] $Key,
 
         # Returns the decrypted value as plain text. The default is to return the decrypted value as a `[securestring]`.
         # When returned as a secure string, the decrypted bytes are only stored in memory as arrays of bytes and chars,
         # which are all cleared once the decrypted text is in the secure string. Once a secure string is converted to a
         # string, that string stays in memory (and possibly disk) for an unknowable amout of time.
-        [switch]$AsPlainText
+        [switch] $AsPlainText
     )
 
     process
@@ -189,36 +188,48 @@ function Unprotect-CString
         # decryption doesn't handle these errors.
         if( $PSCmdlet.ParameterSetName -like 'RSA*' )
         {
-            if( $PSCmdlet.ParameterSetName -notlike '*ByCertificate' )
+            if ($PSCmdlet.ParameterSetName -notlike '*ByCertificate')
             {
-                if( $PSCmdlet.ParameterSetName -like '*ByThumbprint' )
+                $getCertArgs = @{}
+
+                $locationMsg = ''
+                $solutionMsg = 'path to'
+                $paramNameMsg = 'PrivateKeyPath'
+                if ($PSCmdlet.ParameterSetName -like '*ByThumbprint')
                 {
-                    $PrivateKeyPath = "cert:\*\*\$($Thumbprint)"
+                    $getCertArgs['Thumbprint'] = $Thumbprint
+                    $locationMsg = "with thumbprint ${Thumbprint}"
+                    $solutionMsg = 'thumbprint of'
+                    $paramNameMsg = 'Thumbprint'
+                }
+                else
+                {
+                    $getCertArgs['Path'] = $PrivateKeyPath
+                    $locationMsg = "at ""${PrivateKeyPath}"""
                 }
 
-                $passwordParam = @{ }
-                if( $Password )
+                if ($Password)
                 {
-                    $passwordParam = @{ Password = $Password }
+                    $getCertArgs['Password'] = $Password
                 }
 
-                $certificates = Get-CCertificate -Path $PrivateKeyPath @passwordParam
+                $certificates = Get-CCertificate @getCertArgs
                 $count = $certificates | Measure-Object | Select-Object -ExpandProperty 'Count'
-                if( $count -gt 1 )
+                if ($count -gt 1)
                 {
                     $certificates = $certificates | Where-Object { $_.HasPrivateKey -and $_.PrivateKey }
                     $privateKeyCount = $certificates | Measure-Object | Select-Object -ExpandProperty 'Count'
 
-                    if( $privateKeyCount -gt 1 )
+                    if ($privateKeyCount -gt 1)
                     {
-                        $msg = "Found $($privateKeyCount) certificates (which contain private keys) at ""$($PrivateKeyPath)"". " +
-                            'Arbitrarily choosing the first one. If you get errors, consider passing the exact path to ' +
-                            'the certificate you want to the "Unprotect-CString" function''s "PrivateKeyPath" parameter.'
+                        $msg = "Found ${privateKeyCount} certificates (which contain private keys) ${locationMsg}. " +
+                               'Arbitrarily choosing the first one. If you get errors, consider passing the exact ' +
+                               "${solutionMsg} the certificate you want to the ""Unprotect-CString"" function's " +
+                               """${paramNameMsg}"" parameter."
                         Write-Warning -Message $msg
                     }
-                    elseif( $privateKeyCount -eq 0 )
+                    elseif ($privateKeyCount -eq 0)
                     {
-
                         $installedInCertStoreMsg = ''
                         if ($PSCmdlet.ParameterSetName -eq 'RSAByThumbprint')
                         {
@@ -227,14 +238,21 @@ function Unprotect-CString
                                 'current user doesn''t have permission to read the private key.'
                         }
 
-                        "Found $($count) certificates at ""$($PrivateKeyPath)"" but none of them contain a private " +
-                        "key or the private key is null.$(' ' + $installedInCertStoreMsg)" | Write-Error
+                        $msg = "Found ${count} certificates ${locationMsg} but none of them contain a private key or " +
+                               "the private key is null.$(' ' + $installedInCertStoreMsg)"
+                        Write-Error -Message $msg
                         return
                     }
                 }
+
                 $Certificate = $certificates | Select-Object -First 1
-                if( -not $Certificate )
+                if (-not $Certificate)
                 {
+                    if ($Thumbprint)
+                    {
+                        $msg = "Failed to find certificate with thumbprint ${Thumbprint} in any certificate store."
+                        Write-Error -Message $msg
+                    }
                     return
                 }
 

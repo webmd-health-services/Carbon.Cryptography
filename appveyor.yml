@@ -57,6 +57,14 @@ for:
         $url = 'https://raw.githubusercontent.com/webmd-health-services/Prism/main/Scripts/init.ps1'
         $headers = @{ Authentication = "Bearer $($env:GITHUB_ACCESS_TOKEN)" }
         Invoke-WebRequest -Uri $url -Headers $headers | Invoke-Expression | Format-Table
+
+        if( (Test-Path -Path 'env:ENABLE_RDP') -and $env:ENABLE_RDP -eq 'True' )
+        {
+          $nonat = $false
+          $blockRdp = $true
+          iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+        }
+
         try
         {
           .\build.ps1
@@ -77,6 +85,14 @@ for:
         $url = 'https://raw.githubusercontent.com/webmd-health-services/Prism/main/Scripts/init.ps1'
         $headers = @{ Authentication = "Bearer $($env:GITHUB_ACCESS_TOKEN)" }
         Invoke-WebRequest -Uri $url -Headers $headers | Invoke-Expression | Format-Table
+
+        if( (Test-Path -Path 'env:ENABLE_RDP') -and $env:ENABLE_RDP -eq 'True' )
+        {
+          $nonat = $false
+          $blockRdp = $true
+          iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+        }
+
         try
         {
           ./build.ps1

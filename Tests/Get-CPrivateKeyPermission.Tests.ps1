@@ -8,32 +8,40 @@ if ((Test-Path -Path 'variable:IsWindows') -and -not $IsWindows)
     return
 }
 
-$script:rsaCertPath = 'Cert:\CurrentUser\My\44A7C2F73353BC53F82318C14490D7E2500B6DE9'
-$script:cngCertPath = 'Cert:\CurrentUser\My\6CF94E242624811F7E12A5340502C1ECE88F1B18'
-
-BeforeAll {
+BeforeDiscovery {
     Set-StrictMode -Version 'Latest'
 
     & (Join-Path -Path $PSScriptRoot -ChildPath 'Initialize-Test.ps1' -Resolve)
+
+    $script:rsaKeyFilePath =
+        Join-Path -Path $PSScriptRoot -ChildPath 'Certificates\GetCPrivateKeyPermissionUnprotected.pfx' -Resolve
+    $script:rsaKey =
+        Install-CCertificate -Path $script:rsaKeyFilePath -StoreLocation CurrentUser -StoreName My -PassThru
+    $script:rsaCertPath = Join-Path -Path 'Cert:\CurrentUser\My' -ChildPath $script:rsaKey.Thumbprint
+
+    $script:cngKeyFilePath =
+        Join-Path -Path $PSScriptRoot -ChildPath 'Certificates\GetCPrivateKeyPermissionCngUnprotected.pfx' -Resolve
+    $script:cngKey =
+        Install-CCertificate -Path $script:cngKeyFilePath -StoreLocation CurrentUser -StoreName My -PassThru
+    $script:cngCertPath = Join-Path -Path 'Cert:\CurrentUser\My' -ChildPath $script:cngKey.Thumbprint
+}
+
+BeforeAll {
+    Set-StrictMode -Version 'Latest'
 
     $psModulesPath = Join-Path -Path $PSScriptRoot -ChildPath '..\Carbon.Cryptography\Modules' -Resolve
     Import-Module -Name (Join-Path -Path $psModulesPath -ChildPath 'Carbon.Accounts' -Resolve) `
                   -Function @('Test-CPrincipal') `
                   -Verbose:$false
+}
 
-    $script:rsaCertPath = 'Cert:\CurrentUser\My\44A7C2F73353BC53F82318C14490D7E2500B6DE9'
-    $script:cngCertPath = 'Cert:\CurrentUser\My\6CF94E242624811F7E12A5340502C1ECE88F1B18'
-
-    function Get-CertificateWithPrivateKey
-    {
-        Get-Item -Path 'Cert:\*\*' |
-            Where-Object 'Name' -NE 'UserDS' | # This store causes problems on PowerShell 7.
-            Get-ChildItem |
-            Where-Object { -not $_.PsIsContainer } |
-            Where-Object { $_.HasPrivateKey } |
-            Where-Object { $_ | Get-CPrivateKey -ErrorAction Ignore } |
-            Where-Object { -not ($_.EnhancedKeyUsageList | Where-Object 'FriendlyName' -EQ 'Smart Card Logon') }
-    }
+AfterAll {
+    Uninstall-CCertificate -Thumbprint $rsaKey.Thumbprint `
+                           -StoreLocation CurrentUser `
+                           -StoreName My
+    Uninstall-CCertificate -Thumbprint $cngKey.Thumbprint `
+                           -StoreLocation CurrentUser `
+                           -StoreName My
 }
 
 Describe 'Get-CPrivateKeyPermission' {
@@ -41,13 +49,25 @@ Describe 'Get-CPrivateKeyPermission' {
         $Global:Error.Clear()
     }
 
-    $testCases = @(
-        @{ Description = 'RSA' ; CertPath = $script:rsaCertPath },
-        @{ Description = 'CNG' ; CertPath = $script:cngCertPath }
-    )
+    $testCases = & {
+        if (Test-IsAdministrator)
+        {
+            @{ Description = 'RSA' ; CertPath = $script:rsaCertPath } | Write-Output
+        }
+        else
+        {
+            $msg = 'Unable to test if Get-CPrivateKeyPermission works for RSA keys: granting permissions on RSA ' +
+                   'keys requires admin privileges. Yes. Even on CurrentUser keys. Re-run PowerShell as an ' +
+                   'administrator if you also want to test getting permission on RSA keys.'
+            Write-Warning -Message $msg
+        }
+
+        @{ Description = 'CNG' ; CertPath = $script:cngCertPath } | Write-Output
+    }
 
     Context '<Description>' -ForEach $testCases {
         It 'gets private cert permission' {
+            Grant-CPrivateKeyPermission -Path $certPath -Identity 'Everyone' -Permission Read
             $perms = Get-CPrivateKeyPermission -Path $certPath -Inherited -ErrorAction SilentlyContinue
             $perms | Should -Not -BeNullOrEmpty -Because "${certPath} should have private key permissions"
             $pk = Get-Item -Path $CertPath | Get-CPrivateKey
@@ -60,21 +80,19 @@ Describe 'Get-CPrivateKeyPermission' {
             }
             $perms | Should -BeOfType $expectedType
         }
-    }
 
-    It 'gets specific identity permissions' {
-        Get-CertificateWithPrivateKey |
-            Where-Object { $_.PrivateKey } |
-            ForEach-Object { Join-Path -Path 'cert:' -ChildPath (Split-Path -NoQualifier -Path $_.PSPath) } |
-            ForEach-Object {
-                [Object[]]$rules =
-                    Get-CPrivateKeyPermission -Path $_ -ErrorAction Ignore | Where-Object { Test-CPrincipal $_.IdentityReference.Value }
-                foreach( $rule in $rules )
-                {
-                    [Object[]]$identityRule = Get-CPrivateKeyPermission -Path $_ -Identity $rule.IdentityReference.Value
-                    $identityRule | Should -Not -BeNullOrEmpty
-                    $identityRule.Count | Should -BeLessOrEqual $rules.Count
-                }
+        It 'gets specific identity permissions' {
+            [Object[]]$rules =
+                Get-CPrivateKeyPermission -Path $certPath -ErrorAction Ignore |
+                Where-Object { Test-CPrincipal $_.IdentityReference.Value }
+
+            foreach( $rule in $rules )
+            {
+                [Object[]]$identityRule =
+                    Get-CPrivateKeyPermission -Path $certPath -Identity $rule.IdentityReference.Value
+                $identityRule | Should -Not -BeNullOrEmpty
+                $identityRule.Count | Should -BeLessOrEqual $rules.Count
             }
+        }
     }
 }

@@ -4,8 +4,8 @@ Set-StrictMode -Version 'Latest'
 
 if (-not (Get-Command -Name 'certutil' -ErrorAction Ignore))
 {
-    'Convert-CCertificateProvider tests can''t run on this system because the certutil command does not exist.' |
-        Write-Warning
+    $msg = 'Convert-CCertificateProvider tests can''t run on this system because the certutil command does not exist.'
+    Write-Warning -Message $msg
     return
 }
 
@@ -18,13 +18,13 @@ BeforeAll {
     $script:testNum = 0
     $script:result = $null
     $script:sourceCertPathProtected =
-        Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificateWithPassword.pfx' -Resolve
+        Join-Path -Path $PSScriptRoot -ChildPath 'Certificates\ConvertCCertificateProviderProtected.pfx' -Resolve
 
     $script:oldProviderName = 'Microsoft Enhanced Cryptographic Provider v1.0'
     $script:password = ConvertTo-SecureString -String 'password' -AsPlainText -Force
 
     $script:sourceCertPathUnprotected =
-       Join-Path -Path $PSScriptRoot -ChildPath 'Resources\CarbonTestCertificate.pfx' -Resolve
+       Join-Path -Path $PSScriptRoot -ChildPath 'Certificates\ConvertCCertificateProviderUnprotected.pfx' -Resolve
 
     $script:newProviderName = 'Microsoft Enhanced RSA and AES Cryptographic Provider'
 

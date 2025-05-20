@@ -131,16 +131,23 @@ foreach( $user in $users )
     }
 }
 
-
-if (Test-COperatingSystem -IsWindows)
+$testsPath =  Join-Path -Path $PSScriptRoot -ChildPath 'Tests' -Resolve
+foreach ($fileName in @('CarbonRsaCng.pfx', 'CarbonTestPrivateKey.pfx'))
 {
-    $testsPath =  Join-Path -Path $PSScriptRoot -ChildPath 'Tests' -Resolve
-    foreach ($fileName in @('CarbonRsaCng.pfx', 'CarbonTestPrivateKey.pfx'))
+    $certPath = Join-Path -Path $testsPath -ChildPath $fileName
+
+    # LocalMachine My store only supported on Windows
+    if (Test-COperatingSystem -IsWindows)
     {
-        $certPath = Join-Path -Path $testsPath -ChildPath $fileName
         Write-Information "Install ${fileName} in LocalMachine My store."
         Install-CCertificate -Path $certPath -StoreLocation LocalMachine -StoreName My
-        Write-Information "Install ${fileName} in CurrentUser My store."
-        Install-CCertificate -Path $certPath -StoreLocation CurrentUser -StoreName My
     }
+
+    Write-Information "Install ${fileName} in CurrentUser My store."
+    $exportableArg = @{}
+    if ((Test-Path -Path 'variable:IsMacOS') -and $IsMacOS)
+    {
+        $exportableArg['Exportable'] = $true
+    }
+    Install-CCertificate -Path $certPath -StoreLocation CurrentUser -StoreName My @exportableArg
 }
