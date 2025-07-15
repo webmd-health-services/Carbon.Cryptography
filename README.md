@@ -42,4 +42,5 @@ memory, unlike strings, who hang out forever).
 * `Protect-CString`: Encrypt a string using the Windows Data Protection API (DPAPI; Windows only), public/private key
 cryptography, or symmetric cryptography.
 * `Uninstall-CCertificate`: Removes X509 certificates from the Windows certificate store.
+* `Unprotect-CFileToken`: Finds and decrypts all encrypted tokens within a file which were encrypted with `Protect-CString`.
 * `Unprotect-CString`: Decrypt a string that was encrypted with `Protect-CString`.

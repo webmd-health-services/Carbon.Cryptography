@@ -17,7 +17,7 @@
     RootModule = 'Carbon.Cryptography.psm1'
 
     # Version number of this module.
-    ModuleVersion = '3.4.5'
+    ModuleVersion = '3.5.0'
 
     # ID used to uniquely identify this module
     GUID = '225b9f63-3e3e-406c-87a0-33d34f30cd8e'
@@ -93,6 +93,7 @@
         'Revoke-CPrivateKeyPermission',
         'Test-CPrivateKeyPermission',
         'Uninstall-CCertificate',
+        'Unprotect-CFileToken',
         'Unprotect-CString'
     )
 

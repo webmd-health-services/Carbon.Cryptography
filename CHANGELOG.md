@@ -3,10 +3,13 @@
 
 # Carbon.Cryptography Changelog
 
-## 3.4.5
+## 3.5.0
 
-Fixed: `Protect-CString` and `Unprotect-CString` fail on Linux and macOS when given a thumbprint to a certificate in the
-.NET certificate stores.
+> Released 15 Jul 2025
+
+* Added `Unprotect-CFileToken` function which finds and decrypts all encrypted tokens within a file.
+* Fixed: `Protect-CString` and `Unprotect-CString` fail on Linux and macOS when given a thumbprint to a certificate in
+the .NET certificate stores.
 
 ## 3.4.4
 
