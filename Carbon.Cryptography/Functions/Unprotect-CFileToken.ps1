@@ -140,6 +140,11 @@ function Unprotect-CFileToken
         return
     }
 
+    if (-not ([IO.Path]::IsPathRooted($OutputPath)))
+    {
+        $OutputPath = Join-Path -Path (Get-Location) -ChildPath $OutputPath
+    }
+
     if ((Test-Path -LiteralPath $OutputPath) -and (-not $Force))
     {
         $msg = "OutputPath file ""${OutputPath}"" already exists. Use the -Force switch to overwrite."

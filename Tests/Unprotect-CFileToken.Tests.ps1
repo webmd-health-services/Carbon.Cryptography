@@ -402,4 +402,26 @@ key = ${secret}
             ThenNoError
         }
     }
+
+    It 'should write to the correct path when given a relative output path' {
+        $secret = 'hunter2'
+        $cipherText = Protect-CString -String $secret -PublicKeyPath $script:publicKeyPath
+        GivenFile 'config.txt' @"
+password = !ENCRYPTED:${cipherText}!
+"@
+        Push-Location $script:testDir
+        try
+        {
+            Unprotect-CFileToken -Path 'config.txt' -OutputPath 'config.txt.decrypted' -PrivateKeyPath $script:privateKeyUnprotectedPath
+        }
+        finally
+        {
+            Pop-Location
+        }
+
+        ThenFile 'config.txt.decrypted' @"
+password = ${secret}
+"@
+        ThenNoError
+    }
 }
