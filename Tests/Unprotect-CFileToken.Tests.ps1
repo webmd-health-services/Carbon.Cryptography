@@ -50,8 +50,12 @@ BeforeAll {
         )
 
         $filePath = Join-Path -Path $script:testDir -ChildPath $Path
-        New-Item -Path ($filePath | Split-Path -Parent) -ItemType Directory -Force | Write-Debug
-        [IO.File]::WriteAllText($filePath, $Content)
+        New-Item -Path $filePath -ItemType File -Force | Write-Debug
+
+        if ($Content)
+        {
+            [IO.File]::WriteAllText($filePath, $Content)
+        }
     }
 
     function ThenFile
@@ -183,7 +187,7 @@ password = ${secret}
 password = !ENCRYPTED:${cipherText}!
 "@
             { WhenUnprotectingFileToken -Path 'config.txt' -OutputPath 'config.txt' -ErrorAction Stop } |
-                Should -Throw 'OutputPath file "*config.txt" already exists. Use the -Force switch to overwrite.'
+                Should -Throw 'OutputPath file "*config.txt" already exists and isn''t empty. Use the -Force switch to overwrite.'
         }
 
         It 'should succeed when OutputPath exists and using Force' {
@@ -421,6 +425,20 @@ password = !ENCRYPTED:${cipherText}!
 
         ThenFile 'config.txt.decrypted' @"
 password = ${secret}
+"@
+        ThenNoError
+    }
+
+    It 'should not require Force when OutputPath exists but is empty' {
+        $secret = 'hunter2'
+        $cipherText = Protect-CString -String $secret -PublicKeyPath $script:publicKeyPath
+        GivenFile 'config.txt' @"
+password = !ENCRYPTED:${cipherText}!
+"@
+        GivenFile 'empty.txt'
+        WhenUnprotectingFileToken -Path 'config.txt' -OutputPath 'empty.txt' -PrivateKeyPath $script:privateKeyUnprotectedPath
+        ThenFile 'empty.txt' @"
+password = hunter2
 "@
         ThenNoError
     }
