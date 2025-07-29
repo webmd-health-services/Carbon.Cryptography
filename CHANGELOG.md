@@ -3,6 +3,13 @@
 
 # Carbon.Cryptography Changelog
 
+## 3.5.1
+
+> Released 29 Jul 2025
+
+* Fixed: `Unprotect-CFileToken` fails when `OutputPath` is a relative path.
+* Fixed: `Unprotect-CFileToken` shouldn't require `Force` when `OutputPath` already exists but is empty.
+
 ## 3.5.0
 
 > Released 15 Jul 2025

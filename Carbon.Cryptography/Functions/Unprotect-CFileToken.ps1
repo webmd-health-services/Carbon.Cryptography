@@ -140,11 +140,19 @@ function Unprotect-CFileToken
         return
     }
 
-    if ((Test-Path -LiteralPath $OutputPath) -and (-not $Force))
+    if (-not ([IO.Path]::IsPathRooted($OutputPath)))
     {
-        $msg = "OutputPath file ""${OutputPath}"" already exists. Use the -Force switch to overwrite."
-        Write-Error $msg -ErrorAction $ErrorActionPreference
-        return
+        $OutputPath = Join-Path -Path (Get-Location) -ChildPath $OutputPath
+    }
+
+    if (Test-Path -LiteralPath $OutputPath)
+    {
+        if (((Get-Item -LiteralPath $OutputPath).Length -ne 0) -and (-not $Force))
+        {
+            $msg = "OutputPath file ""${OutputPath}"" already exists and isn't empty. Use the -Force switch to overwrite."
+            Write-Error $msg -ErrorAction $ErrorActionPreference
+            return
+        }
     }
 
     $fileContent = Get-Content -LiteralPath $Path -Raw
