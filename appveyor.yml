@@ -12,34 +12,57 @@ test: false
 environment:
   WHISKEY_DISABLE_ERROR_FORMAT: True
   matrix:
-  # Skip PowerShell Core on Windows until 7.4.1 is installed
-  # on https://www.appveyor.com/docs/windows-images-software
-  # Due to https://github.com/PowerShell/PowerShell/issues/20711
+  # Windows
+  # https://www.appveyor.com/docs/windows-images-software/
+  - job_name: Windows PowerShell 5.1 on Windows Server 2016
+    job_group: ps
+    appveyor_build_worker_image: Visual Studio 2017
 
-  # - job_name: PowerShell on Windows
-  #   job_group: pwsh
-  #   appveyor_build_worker_image: Visual Studio 2022
+  - job_name: Windows PowerShell 5.1 on Windows Server 2019
+    job_group: ps
+    appveyor_build_worker_image: Visual Studio 2022
 
-  - job_name: PowerShell on macOS
+  # PowerShell 7 on Windows only available on Windows Server 2019 build image
+  - job_name: PowerShell 7 on Windows Server 2019
     job_group: pwsh
-    appveyor_build_worker_image: macOS
+    appveyor_build_worker_image: Visual Studio 2022
 
-  - job_name: Windows PowerShell 5.1/.NET 4.6.2
-    job_group: ps
-    appveyor_build_worker_image: Visual Studio 2013
-
-  - job_name: Windows PowerShell 5.1/.NET 4.8
-    job_group: ps
-    appveyor_build_worker_image: Visual Studio 2019
-
-  - job_name: PowerShell 6 on Windows
+  # PowerShell 6 on Windows only available on Windows Server 2016 build image
+  - job_name: PowerShell 6 on Windows Server 2016
     job_group: pwsh
     appveyor_build_worker_image: Visual Studio 2017
 
-  - job_name: PowerShell on Ubuntu
+  # Linux
+  # https://www.appveyor.com/docs/linux-images-software/
+  - job_name: PowerShell 7 on Ubuntu 18 "Bionic Beaver"
     job_group: pwsh
     appveyor_build_worker_image: Ubuntu
 
+  - job_name: PowerShell 7 on Ubuntu 20 "Focal Fossa"
+    job_group: pwsh
+    appveyor_build_worker_image: Ubuntu2004
+
+  - job_name: PowerShell 7 on Ubuntu 22 "Jammy Jellyfish"
+    job_group: pwsh
+    appveyor_build_worker_image: Ubuntu2204
+
+  - job_name: PowerShell 7 on Ubuntu 24 "Noble Numbat"
+    job_group: pwsh
+    appveyor_build_worker_image: Ubuntu2204
+
+  # macOS
+  # https://www.appveyor.com/docs/macos-images-software/
+  - job_name: PowerShell 7 on macOS 12 "Monterey"
+    job_group: pwsh
+    appveyor_build_worker_image: macos-monterey
+
+  - job_name: PowerShell 7 on macOS 13 "Ventura"
+    job_group: pwsh
+    appveyor_build_worker_image: macos-ventura
+
+  - job_name: PowerShell 7 on macOS 14 "Sonoma"
+    job_group: pwsh
+    appveyor_build_worker_image: macos-sonoma
 
 artifacts:
 - path: .output\*
