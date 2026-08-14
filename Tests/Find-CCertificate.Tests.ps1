@@ -241,4 +241,40 @@ Describe 'Find-CCertificate' {
         WhenFinding @{ StoreName = 'Root' ; StoreLocation = 'CurrentUser' }
         ThenFound 'example.com' -In 'Root' -For 'CurrentUser'
     }
+
+    It 'finds no certificates' {
+        WhenFinding @{ HostName = 'CN=IDoNotExist' }
+        $script:result | Should -BeNullOrEmpty
+    }
+
+    Context 'logging' {
+        Context 'certificate found' {
+            It 'logs only to debug stream' {
+                $subject =
+                    Get-CCertificate -StoreLocation CurrentUser -StoreName My |
+                    Select-Object -ExpandProperty 'Subject' -ErrorAction Ignore |
+                    Where-Object { $_ } |
+                    Select-Object -Last 1
+                $subject | Should -Not -BeNullOrEmpty
+                $DebugPreference = 'Continue'
+                $messages = Find-CCertificate -Subject $subject 5>&1
+                $messages | Where-Object { $_ -like '*^-*-^*' } | Should -Not -BeNullOrEmpty
+                $DebugPreference = 'SilentlyContinue'
+                $VerbosePreference = 'Continue'
+                $messages = Find-CCertificate -HostName $subject 4>&1
+                $messages | Where-Object { $_ -like '-*-' } | Should -BeNullOrEmpty
+            }
+        }
+        Context 'certificate not found' {
+            It 'logs only to verbose stream' {
+                $DebugPreference = 'SilentlyContinue'
+                $VerbosePreference = 'Continue'
+                # Will display verbose output to the console.
+                $messages = Find-CCertificate -Subject 'CN=IDoNotExist' 5>&1
+                $messages | Where-Object { $_ -match '[A-F0-9]{40}' } | Should -BeNullOrEmpty
+                $messages = Find-CCertificate -Subject 'CN=IDoNotExist' 4>&1
+                $messages | Where-Object { $_ -match '[A-F0-9]{40}' } | Should -Not -BeNullOrEmpty
+            }
+        }
+    }
 }

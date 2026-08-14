@@ -25,6 +25,33 @@ function Find-CCertificate
     `StoreLocation` parameter. You can search in different stores by passing the store name to the `StoreName`
     parameter.
 
+    Enable debug messages to see detailed information about why a certificate isn't or isn't being found. You'll see
+    messages for each selection criteria and if a criterium isn't met, you'll see a `!` flag. For example, this debug
+    output from `Find-CCertificate -HostName 'example.com' -Active -HasPrivateKey -Trusted`:
+
+        CN=sub.example.com
+        FCD157FCB753E2B388183C19021301B1739DF1E2
+            private key      True
+            start date       2021-10-18 15:43:23
+            expiration date  2023-10-19 15:43:23
+          ! hostname         ['sub.example.com']
+
+        CN=example.com
+        7F660D4F7201B8EB8F7F6AC2A0906253C240584F
+            private key      True
+            start date       2021-10-18 15:43:23
+            expiration date  2022-10-19 15:43:23
+            hostname         ['example.com']
+            trusted          True
+        ^--------------------------------------^
+
+    shows that certificate `FCD157FCB753E2B388183C19021301B1739DF1E2` wasn't selected because its hostname didn't match
+    the `example.com` hostname, but that certificate `7F660D4F7201B8EB8F7F6AC2A0906253C240584F` was selected because it
+    matched six criteria.
+
+    If a certificate isn't found and debug messages are off, the search log is written to the verbose
+    stream instead of the debug stream.
+
     .EXAMPLE
     Find-CCertificate -Active -HostName 'dev.example.com' -KeyUsageName 'Server Authentication' -Trusted -HasPrivateKey
 
@@ -57,339 +84,380 @@ function Find-CCertificate
             [Security.Cryptography.X509Certificates.StoreName]::My
     )
 
-    Set-StrictMode -Version 'Latest'
-    Use-CallerPreference -Cmdlet $PSCmdlet -Session $ExecutionContext.SessionState
-
-    Write-Verbose 'Find-CCertificate search criteria:'
-    if( $Subject )
+    begin
     {
-        Write-Verbose ("  Subject        like  $($Subject)")
-    }
-    if( $LiteralSubject )
-    {
-        Write-Verbose ("  Subject        eq    $($LiteralSubject)")
-    }
-    if( $Active )
-    {
-        Write-Verbose ('  Active         True')
-    }
-    if( $HasPrivateKey )
-    {
-        Write-Verbose ('  HasPrivateKey  True')
-    }
-    if( $HostName )
-    {
-        Write-Verbose ("  HostName       like  $($HostName)")
-    }
-    if( $LiteralHostName )
-    {
-        Write-Verbose ("  HostName       eq    $($LiteralHostName)")
-    }
-    if( $KeyUsageName )
-    {
-        Write-Verbose ("  Key Usage      $($KeyUsageName)")
-    }
-    if( $KeyUsageOid )
-    {
-        Write-Verbose ("  Key Usage OID  $($KeyUsageOid)")
-    }
-    if( $Trusted )
-    {
-        Write-Verbose ("  Trusted        True")
-    }
-    if( $StoreLocation )
-    {
-        Write-Verbose ("  StoreLocation  $($StoreLocation)")
-    }
-    if( $StoreName )
-    {
-        Write-Verbose ("  StoreName      $($StoreName)")
-    }
-    Write-Verbose ''
+        Set-StrictMode -Version 'Latest'
+        Use-CallerPreference -Cmdlet $PSCmdlet -Session $ExecutionContext.SessionState
 
-    function Test-Object
-    {
-        [CmdletBinding()]
-        param(
-            [Parameter(Mandatory, ValueFromPipeline)]
-            [AllowEmptyString()]
-            [AllowNull()]
-            [Object] $InputObject,
+        $foundACert = $false
 
-            [Parameter(Mandatory, ParameterSetName='Equals')]
-            [AllowEmptyString()]
-            [AllowNull()]
-            [switch] $Equals,
+        $searchLog = [Text.StringBuilder]::New()
 
-            [Parameter(Mandatory, ParameterSetName='LessThan')]
-            [switch] $LessThan,
+        $actionPrefEnabledValues = @('Inquire', 'Continue', 'Suspend')
+        $debugEnabled = $DebugPreference -in $actionPrefEnabledValues
+        $searchLogEnabled = -not $debugEnabled -and $VerbosePreference -in $actionPrefEnabledValues
 
-            [Parameter(Mandatory, ParameterSetName='GreaterThan')]
-            [switch] $GreaterThan,
-
-            [Parameter(Mandatory, ParameterSetName='Contains')]
-            [switch] $Contains,
-
-            [Parameter(Mandatory, ParameterSetName='ContainsLike')]
-            [switch] $ContainsLike,
-
-            [Parameter(Mandatory, ParameterSetName='Matches')]
-            [switch] $Match,
-
-            [Parameter(Mandatory, ParameterSetName='Like')]
-            [switch] $Like,
-
-            [Parameter(Mandatory, Position=0)]
-            [Object] $Value,
-
-            [Parameter(Mandatory)]
-            [String] $Name,
-
-            [String] $DisplayValue
-        )
-
-        process
+        function Write-SearchLog
         {
-            $success = $false
+            param(
+                [Parameter(Mandatory)]
+                [AllowEmptyString()]
+                [String] $Message
+            )
 
-            if( $Equals )
+            if ($searchLogEnabled)
             {
-                if( $null -eq $InputObject )
+                [void]$searchLog.AppendLine($Message)
+                return
+            }
+
+            Write-Debug $Message
+        }
+
+        function Test-Object
+        {
+            [CmdletBinding()]
+            param(
+                [Parameter(Mandatory, ValueFromPipeline)]
+                [AllowEmptyString()]
+                [AllowNull()]
+                [Object] $InputObject,
+
+                [Parameter(Mandatory, ParameterSetName='Equals')]
+                [AllowEmptyString()]
+                [AllowNull()]
+                [switch] $Equals,
+
+                [Parameter(Mandatory, ParameterSetName='LessThan')]
+                [switch] $LessThan,
+
+                [Parameter(Mandatory, ParameterSetName='GreaterThan')]
+                [switch] $GreaterThan,
+
+                [Parameter(Mandatory, ParameterSetName='Contains')]
+                [switch] $Contains,
+
+                [Parameter(Mandatory, ParameterSetName='ContainsLike')]
+                [switch] $ContainsLike,
+
+                [Parameter(Mandatory, ParameterSetName='Matches')]
+                [switch] $Match,
+
+                [Parameter(Mandatory, ParameterSetName='Like')]
+                [switch] $Like,
+
+                [Parameter(Mandatory, Position=0)]
+                [Object] $Value,
+
+                [Parameter(Mandatory)]
+                [String] $Name,
+
+                [String] $DisplayValue
+            )
+
+            process
+            {
+                $success = $false
+
+                if( $Equals )
                 {
-                    if( $null -eq $Value )
+                    if( $null -eq $InputObject )
+                    {
+                        if( $null -eq $Value )
+                        {
+                            $success = $true
+                        }
+                    }
+                    elseif( $InputObject -eq $Value )
                     {
                         $success = $true
                     }
                 }
-                elseif( $InputObject -eq $Value )
+                elseif( $LessThan )
                 {
-                    $success = $true
+                    $success = $InputObject -lt $Value
                 }
-            }
-            elseif( $LessThan )
-            {
-                $success = $InputObject -lt $Value
-            }
-            elseif( $GreaterThan )
-            {
-                $success = $InputObject -gt $Value
-            }
-            elseif( $Contains )
-            {
-                $success = $InputObject -contains $Value
-            }
-            elseif( $ContainsLike )
-            {
-                $success = $false
-
-                foreach ($nameItem in $InputObject)
+                elseif( $GreaterThan )
                 {
-                    # If the first character of the item is a wildcard character.
-                    if ($nameItem[0] -eq '*')
-                    {
-                        # Wildcards in certificates only ever match one "level" of a domain name and must be on the very left.
-                        # Therefore the wildcard can match any character except for "."
-                        $wildcardRegex = '[^\.]+'
-                        $baseName = $nameItem.Substring(1)               # *.example.com  ➔ .example.com
-                        $escapedBaseName = [Regex]::Escape($baseName)    #  .example.com  ➔ \.example\.com
-                        $regex = "^${wildcardRegex}$($escapedBaseName)$" # \.example\.com ➔ ^[^\.]+\.example\.com$
-                        $success = $Value -match $regex
-                    }
-                    else
-                    {
-                        $success = $nameItem -like $Value
-                    }
-
-                    # Found a match.
-                    if ($success)
-                    {
-                        break
-                    }
+                    $success = $InputObject -gt $Value
                 }
+                elseif( $Contains )
+                {
+                    $success = $InputObject -contains $Value
+                }
+                elseif( $ContainsLike )
+                {
+                    $success = $false
 
-            }
-            elseif( $Match )
-            {
-                $success = $InputObject -match $Value
-            }
-            elseif( $Like )
-            {
-                $success = $InputObject -like $Value
-            }
-
-            $flag = '!'
-            if( $success )
-            {
-                $flag = ' '
-            }
-
-            if( -not $DisplayValue )
-            {
-                $displayValues =
-                    $InputObject |
-                    Where-Object { $null -ne $_ } |
-                    ForEach-Object { $_ } |
-                    Where-Object { $null -ne $_ } |
-                    ForEach-Object {
-                        if( $_ -is [DateTime] )
+                    foreach ($nameItem in $InputObject)
+                    {
+                        # If the first character of the item is a wildcard character.
+                        if ($nameItem[0] -eq '*')
                         {
-                            return $_.ToString('yyyy-MM-dd HH:mm:ss')
+                            # Wildcards in certificates only ever match one "level" of a domain name and must be on the very left.
+                            # Therefore the wildcard can match any character except for "."
+                            $wildcardRegex = '[^\.]+'
+                            $baseName = $nameItem.Substring(1)               # *.example.com  ➔ .example.com
+                            $escapedBaseName = [Regex]::Escape($baseName)    #  .example.com  ➔ \.example\.com
+                            $regex = "^${wildcardRegex}$($escapedBaseName)$" # \.example\.com ➔ ^[^\.]+\.example\.com$
+                            $success = $Value -match $regex
                         }
-                        return $_.ToString()
+                        else
+                        {
+                            $success = $nameItem -like $Value
+                        }
+
+                        # Found a match.
+                        if ($success)
+                        {
+                            break
+                        }
                     }
-                $DisplayValue = $displayValues -join ', '
-            }
+                }
+                elseif( $Match )
+                {
+                    $success = $InputObject -match $Value
+                }
+                elseif( $Like )
+                {
+                    $success = $InputObject -like $Value
+                }
 
-            $name = '{0,-22}' -f $Name
-            $msg = "  $($flag) $($Name)  $($DisplayValue)"
-            if( $longestLineLength -lt $msg.Length )
-            {
-                $script:longestLineLength = $msg.Length
+                $flag = '!'
+                if( $success )
+                {
+                    $flag = ' '
+                }
+
+                if( -not $DisplayValue )
+                {
+                    $displayValues =
+                        $InputObject |
+                        Where-Object { $null -ne $_ } |
+                        ForEach-Object { $_ } |
+                        Where-Object { $null -ne $_ } |
+                        ForEach-Object {
+                            if( $_ -is [DateTime] )
+                            {
+                                return $_.ToString('yyyy-MM-dd HH:mm:ss')
+                            }
+                            return $_.ToString()
+                        }
+                    $DisplayValue = $displayValues -join ', '
+                }
+
+                $name = '{0,-22}' -f $Name
+                $msg = "  $($flag) $($Name)  $($DisplayValue)"
+                if( $longestLineLength -lt $msg.Length )
+                {
+                    $script:longestLineLength = $msg.Length
+                }
+                Write-SearchLog $msg
+                return $success
             }
-            Write-Verbose -Message $msg
-            return $success
         }
     }
 
-    $getCertArgs = @{}
-
-    if( $StoreLocation )
+    process
     {
-        $getCertArgs['StoreLocation'] = $StoreLocation
-    }
-
-    $certs = Get-CCertificate @getCertArgs -StoreName $StoreName
-    $isFirstCert = $true
-    foreach( $certificate in $certs )
-    {
-        if( $isFirstCert )
-        {
-            $isFirstCert = $false
-        }
-        else
-        {
-            Write-Verbose ('')
-        }
-
-        Write-Verbose -Message ("$($certificate.Subject)")
-        Write-Verbose -Message ("$($certificate.Thumbprint)")
-
-        $script:longestLineLength = $certificate.Subject.Length
-        if( $script:longestLineLength -lt $certificate.Thumbprint.Length )
-        {
-            $script:longestLineLength = $certificate.Thumbprint.Length
-        }
-
+        Write-SearchLog 'Find-CCertificate search criteria:'
         if( $Subject )
         {
-            if( -not ($certificate.Subject | Test-Object -Like $Subject -Name 'subject') )
-            {
-                continue
-            }
+            Write-SearchLog "  Subject        like  $($Subject)"
         }
-
         if( $LiteralSubject )
         {
-            if( -not ($certificate.Subject | Test-Object -Equals $LiteralSubject -Name 'subject') )
-            {
-                continue
-            }
+            Write-SearchLog "  Subject        eq    $($LiteralSubject)"
         }
-
-        if( $HasPrivateKey.IsPresent )
-        {
-            if( -not ($certificate.HasPrivateKey | Test-Object -Equals $HasPrivateKey -Name 'private key') )
-            {
-                continue
-            }
-        }
-
         if( $Active )
         {
-            if( -not ($certificate.NotBefore | Test-Object -LessThan (Get-Date) -Name 'start date') )
-            {
-                continue
-            }
-
-            if( -not ($certificate.NotAfter | Test-Object -GreaterThan (Get-Date) -Name 'expiration date') )
-            {
-                continue
-            }
+            Write-SearchLog '  Active         True'
         }
-
-        $subjectHostName = ''
-        if( $certificate.Subject -match '^CN=([^,]+),?.*$' )
+        if( $HasPrivateKey )
         {
-            $subjectHostName = $Matches[1]
+            Write-SearchLog '  HasPrivateKey  True'
         }
-
         if( $HostName )
         {
-            $inSubject = $subjectHostName | Test-Object -Like $HostName -Name 'subject common name'
-            if( -not $inSubject )
-            {
-                $found =
-                    (,$certificate.DnsNameList | Test-Object -ContainsLike $HostName -Name 'subject alternate name')
-                if( -not $found )
-                {
-                    continue
-                }
-            }
+            Write-SearchLog "  HostName       like  $($HostName)"
         }
-
         if( $LiteralHostName )
         {
-            $inSubject = $subjectHostName | Test-Object -Equals $LiteralHostName -Name 'subject common name'
-            if( -not $inSubject )
-            {
-                $found =
-                    (,$certificate.DnsNameList | Test-Object -Contains $LiteralHostName -Name 'subject alternate name')
-                if( -not $found )
-                {
-                    continue
-                }
-            }
+            Write-SearchLog "  HostName       eq    $($LiteralHostName)"
+        }
+        if( $KeyUsageName )
+        {
+            Write-SearchLog "  Key Usage      $($KeyUsageName)"
+        }
+        if( $KeyUsageOid )
+        {
+            Write-SearchLog "  Key Usage OID  $($KeyUsageOid)"
+        }
+        if( $Trusted )
+        {
+            Write-SearchLog "  Trusted        True"
+        }
+        if( $StoreLocation )
+        {
+            Write-SearchLog "  StoreLocation  $($StoreLocation)"
+        }
+        if( $StoreName )
+        {
+            Write-SearchLog "  StoreName      $($StoreName)"
+        }
+        Write-SearchLog ''
+
+        $getCertArgs = @{}
+
+        if( $StoreLocation )
+        {
+            $getCertArgs['StoreLocation'] = $StoreLocation
         }
 
-        if( $KeyUsageName -or $KeyUsageOid )
+        $certs = Get-CCertificate @getCertArgs -StoreName $StoreName
+        $isFirstCert = $true
+        foreach( $certificate in $certs )
         {
-            if( $certificate.EnhancedKeyUsageList.Count -eq 0 )
+            if( $isFirstCert )
             {
-                $certificate.EnhancedKeyUsageList.Count |
-                    Test-Object -Equals 0 -Name 'key usage' -DisplayValue 'Any' |
-                    Out-Null
+                $isFirstCert = $false
             }
             else
             {
-                if( $KeyUsageName )
-                {
-                    $names = $certificate.EnhancedKeyUsageList | Select-Object -ExpandProperty 'FriendlyName'
-                    if( -not (,$names | Test-Object -Contains $KeyUsageName -Name 'key usage') )
-                    {
-                        continue
-                    }
-                }
-
-                if( $KeyUsageOid )
-                {
-                    $oids = $certificate.EnhancedKeyUsageList | Select-Object -ExpandProperty 'ObjectId'
-                    if( -not (,$oids | Test-Object -Contains $KeyUsageOid -Name 'key usage') )
-                    {
-                        continue
-                    }
-                }
+                Write-SearchLog ''
             }
-        }
 
-        if( $Trusted )
-        {
-            if( -not $certificate.Verify() | Test-Object -Equals $true -Name 'trusted' )
+            Write-SearchLog $certificate.Subject
+            Write-SearchLog $certificate.Thumbprint
+
+            $script:longestLineLength = $certificate.Subject.Length
+            if( $script:longestLineLength -lt $certificate.Thumbprint.Length )
             {
-                continue
+                $script:longestLineLength = $certificate.Thumbprint.Length
             }
-        }
 
-        Write-Verbose -Message "^$('-' * ($longestLineLength - 1))^"
-        $certificate | Write-Output
+            if( $Subject )
+            {
+                if( -not ($certificate.Subject | Test-Object -Like $Subject -Name 'subject') )
+                {
+                    continue
+                }
+            }
+
+            if( $LiteralSubject )
+            {
+                if( -not ($certificate.Subject | Test-Object -Equals $LiteralSubject -Name 'subject') )
+                {
+                    continue
+                }
+            }
+
+            if( $HasPrivateKey.IsPresent )
+            {
+                if( -not ($certificate.HasPrivateKey | Test-Object -Equals $HasPrivateKey -Name 'private key') )
+                {
+                    continue
+                }
+            }
+
+            if( $Active )
+            {
+                if( -not ($certificate.NotBefore | Test-Object -LessThan (Get-Date) -Name 'start date') )
+                {
+                    continue
+                }
+
+                if( -not ($certificate.NotAfter | Test-Object -GreaterThan (Get-Date) -Name 'expiration date') )
+                {
+                    continue
+                }
+            }
+
+            $subjectHostName = ''
+            if( $certificate.Subject -match '^CN=([^,]+),?.*$' )
+            {
+                $subjectHostName = $Matches[1]
+            }
+
+            if( $HostName )
+            {
+                $inSubject = $subjectHostName | Test-Object -Like $HostName -Name 'subject common name'
+                if( -not $inSubject )
+                {
+                    $found =
+                        (,$certificate.DnsNameList | Test-Object -ContainsLike $HostName -Name 'subject alternate name')
+                    if( -not $found )
+                    {
+                        continue
+                    }
+                }
+            }
+
+            if( $LiteralHostName )
+            {
+                $inSubject = $subjectHostName | Test-Object -Equals $LiteralHostName -Name 'subject common name'
+                if( -not $inSubject )
+                {
+                    $found =
+                        (,$certificate.DnsNameList | Test-Object -Contains $LiteralHostName -Name 'subject alternate name')
+                    if( -not $found )
+                    {
+                        continue
+                    }
+                }
+            }
+
+            if( $KeyUsageName -or $KeyUsageOid )
+            {
+                if( $certificate.EnhancedKeyUsageList.Count -eq 0 )
+                {
+                    $certificate.EnhancedKeyUsageList.Count |
+                        Test-Object -Equals 0 -Name 'key usage' -DisplayValue 'Any' |
+                        Out-Null
+                }
+                else
+                {
+                    if( $KeyUsageName )
+                    {
+                        $names = $certificate.EnhancedKeyUsageList | Select-Object -ExpandProperty 'FriendlyName'
+                        if( -not (,$names | Test-Object -Contains $KeyUsageName -Name 'key usage') )
+                        {
+                            continue
+                        }
+                    }
+
+                    if( $KeyUsageOid )
+                    {
+                        $oids = $certificate.EnhancedKeyUsageList | Select-Object -ExpandProperty 'ObjectId'
+                        if( -not (,$oids | Test-Object -Contains $KeyUsageOid -Name 'key usage') )
+                        {
+                            continue
+                        }
+                    }
+                }
+            }
+
+            if( $Trusted )
+            {
+                if( -not $certificate.Verify() | Test-Object -Equals $true -Name 'trusted' )
+                {
+                    continue
+                }
+            }
+
+            $foundACert = $true
+            Write-SearchLog "^$('-' * ($longestLineLength - 2))^"
+
+            $certificate | Write-Output
+        }
+    }
+
+    end
+    {
+        if (-not $foundACert -and $searchLogEnabled)
+        {
+            [void]$searchLog.Insert(0, [Environment]::NewLine)
+            Write-Verbose -Message $searchLog.ToString()
+        }
     }
 }

@@ -3,6 +3,11 @@
 
 # Carbon.Cryptography Changelog
 
+## 3.6.0
+
+The `Find-CCertificate` and `Find-CTlsCertificate` search log is now written to the debug stream instead of the verbose
+stream, unless no certificate is found.
+
 ## 3.5.1
 
 > Released 29 Jul 2025
