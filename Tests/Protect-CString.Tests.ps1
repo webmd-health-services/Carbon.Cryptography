@@ -126,7 +126,7 @@ Describe 'Protect-CString' {
 
         It 'should handle path not found' {
             $ciphertext = Protect-CString -String 'fubar' `
-                                          -PublicKeyPath 'cert:\currentuser\fubar' `
+                                          -PublicKeyPath 'cert:\CurrentUser\My\fubar' `
                                           -ErrorAction SilentlyContinue
             $Global:Error.Count | Should -BeGreaterThan 0
             $Global:Error[0] | Should -Match 'not found'

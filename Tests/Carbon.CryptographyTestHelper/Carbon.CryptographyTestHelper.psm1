@@ -258,7 +258,15 @@ function Test-Remoting
         [switch] $IsAvailable
     )
 
-    return -not (Test-RunningUnderBuildServer) -and (Test-COperatingSystem -Windows) -and (Test-IsAdministrator)
+    $remotingEnabled =
+         -not (Test-RunningUnderBuildServer) -and (Test-COperatingSystem -Windows) -and (Test-IsAdministrator)
+
+    if (-not $remotingEnabled -or -not (Get-Command -Name 'Get-Service' -ErrorAction Ignore))
+    {
+        return $remotingEnabled
+    }
+
+    return (Get-Service -Name 'WinRM').StartType -ne 'Disabled'
 }
 
 function Test-RunningUnderBuildServer
@@ -266,7 +274,7 @@ function Test-RunningUnderBuildServer
     return (Test-Path -Path 'env:WHS_CI')
 }
 
-if( (Test-Remoting -IsAvailable) -and (Get-Command -Name 'Get-Service' -ErrorAction Ignore) )
+if ((Test-Remoting -IsAvailable) -and (Get-Command -Name 'Get-Service' -ErrorAction Ignore) )
 {
     Start-Service 'WinRM'
 }

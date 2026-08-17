@@ -74,17 +74,21 @@ for:
     only:
     - job_group: ps
   build_script:
-  - ps: |
+  - ps: &build_script |
         $PSVersionTable
         $ProgressPreference = 'SilentlyContinue'
         $url = 'https://raw.githubusercontent.com/webmd-health-services/Prism/main/Scripts/init.ps1'
         $headers = @{ Authentication = "Bearer $($env:GITHUB_ACCESS_TOKEN)" }
         Invoke-WebRequest -Uri $url -Headers $headers | Invoke-Expression | Format-Table
 
-        if( (Test-Path -Path 'env:ENABLE_RDP') -and $env:ENABLE_RDP -eq 'True' )
+        $enableRdp = $env:ENABLE_RDP -eq 'True'
+        $blockRdpBefore = $env:BLOCK_RDP_BEFORE_BUILD -eq 'True'
+        $blockRdpAfter = $env:BLOCK_RDP_AFTER_BUILD -eq 'True'
+
+        if ($enableRdp)
         {
           $nonat = $false
-          $blockRdp = $true
+          $blockRdp = $blockRdpBefore
           iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
         }
 
@@ -95,6 +99,13 @@ for:
         finally
         {
           $Global:Error | Format-List * -Force
+
+          if ($enableRdp)
+          {
+            $nonat = $false
+            $blockRdp = $blockRdpAfter
+            iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+          }
         }
 
 # Build in PowerShell
@@ -102,25 +113,4 @@ for:
     only:
     - job_group: pwsh
   build_script:
-  - pwsh: |
-        $PSVersionTable
-        $ProgressPreference = 'SilentlyContinue'
-        $url = 'https://raw.githubusercontent.com/webmd-health-services/Prism/main/Scripts/init.ps1'
-        $headers = @{ Authentication = "Bearer $($env:GITHUB_ACCESS_TOKEN)" }
-        Invoke-WebRequest -Uri $url -Headers $headers | Invoke-Expression | Format-Table
-
-        if( (Test-Path -Path 'env:ENABLE_RDP') -and $env:ENABLE_RDP -eq 'True' )
-        {
-          $nonat = $false
-          $blockRdp = $true
-          iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
-        }
-
-        try
-        {
-          ./build.ps1
-        }
-        finally
-        {
-          $Global:Error | Format-List * -Force
-        }
+  - pwsh: *build_script
