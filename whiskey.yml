@@ -9,16 +9,16 @@ Build:
 
 # Update the AppVeyor build/version number.
 - Exec:
-      OnlyBy: BuildServer
+      .OnlyBy: BuildServer
       Path: appveyor
       Argument: [ UpdateBuild, -Version, "$(WHISKEY_SEMVER2)+$(WHISKEY_BUILD_NUMBER)" ]
 
 # Dot-sourcing files is expensive. Move all functions into .psm1 file to improve import speed. Do this before testing
 # to ensure the module still works.
 - MergeFile:
-    OnlyBy: BuildServer
+    .OnlyBy: BuildServer
     # Builds run twice on some serves. Only run this step if the module hasn't been merged yet.
-    IfExists: Carbon.Cryptography\Functions\*.ps1
+    .IfExists: Carbon.Cryptography\Functions\*.ps1
     Path:
     - Carbon.Cryptography\Functions\*.ps1
     DestinationPath: Carbon.Cryptography\Carbon.Cryptography.psm1
@@ -26,15 +26,15 @@ Build:
     TextSeparator: "$(NewLine)$(NewLine)"
 
 - PowerShell:
-    ExceptDuring: Clean
+    .ExceptDuring: Clean
     Path: init.ps1
 
 - PowerShell:
-    OnlyDuring: Clean
+    .OnlyDuring: Clean
     Path: reset.ps1
 
 - Delete:
-    OnlyBy: BuildServer
+    .OnlyBy: BuildServer
     Path: Carbon.Cryptography\prism.*
 
 - CopyFile:
@@ -55,7 +55,7 @@ Build:
     - "prism.*"
 
 - Exec:
-    OnlyBy: BuildServer
+    .OnlyBy: BuildServer
     Path: appveyor
     Argument: [ 'PushArtifact', '.output/Carbon.Cryptography-$(WHISKEY_SEMVER2).zip', '-DeploymentName', 'GitHub' ]
 
@@ -63,7 +63,7 @@ Build:
     Path: Carbon.Cryptography
 
 - Exec:
-    OnlyBy: BuildServer
+    .OnlyBy: BuildServer
     Path: appveyor
     Argument: [
         'PushArtifact',
@@ -90,7 +90,7 @@ Build:
 - Pester:
     # Because the DSC resource in the test is resolved during parsing not execution and New-CRsaKeyPair is only
     # Supported on Windows.
-    OnlyOnPlatform: Windows
+    .OnlyOnPlatform: Windows
     Configuration:
         Run:
             Path: Tests\New-CRsaKeyPair.Tests.ps1

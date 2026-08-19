@@ -107,7 +107,9 @@ BeforeAll {
             return
         }
 
-        Measure-PhysicalStore -Location $ForLocation | Should -Be $ExpectedCount
+        # Testing that Install-CCertificate uses the right key storage flags to that it doesn't install temp certificate
+        # files when reading certificate files.
+        Measure-PhysicalStore -Location $ForLocation | Should -BeLessOrEqual $ExpectedCount
     }
 
     function WhenInstalling
